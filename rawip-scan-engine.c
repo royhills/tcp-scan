@@ -19,7 +19,7 @@
  * 
  */
 
-#include "sql-slammer-scan.h"
+#include "udp-scan-engine.h"
 
 static char const rcsid[] = "$Id$";	/* RCS ID for ident(1) */
 
@@ -31,6 +31,7 @@ unsigned responders = 0;		/* Number of hosts which responded */
 unsigned live_count;			/* Number of entries awaiting reply */
 int verbose=0;				/* Verbose level */
 int debug = 0;				/* Debug flag */
+extern int dest_port;			/* UDP destination port */
 
 int
 main(int argc, char *argv[]) {
@@ -73,7 +74,6 @@ main(int argc, char *argv[]) {
    unsigned select_timeout = DEFAULT_SELECT_TIMEOUT;	/* Select timeout */
    float backoff = DEFAULT_BACKOFF_FACTOR;	/* Backoff factor */
    int source_port = DEFAULT_SOURCE_PORT;	/* UDP source port */
-   int dest_port = DEFAULT_DEST_PORT;	/* UDP destination port */
    struct timeval last_packet_time;	/* Time last packet was sent */
 /*
  *	Open syslog channel and log arguments if required.
@@ -97,6 +97,10 @@ main(int argc, char *argv[]) {
    }
    info_syslog("Starting: %s", arg_str);
 #endif
+/*
+ *	Call initialisation routine to perform any initial setup required.
+ */
+   initialise();
 /*
  *	Process options and arguments.
  */
@@ -134,11 +138,7 @@ main(int argc, char *argv[]) {
             verbose++;
             break;
          case 'V':	/* --version */
-            fprintf(stderr, "%s\n\n", PACKAGE_STRING);
-            fprintf(stderr, "Copyright (C) 2003 Roy Hills, NTA Monitor Ltd.\n");
-            fprintf(stderr, "\n");
-/* We use rcsid here to prevent it being optimised away */
-            fprintf(stderr, "%s\n", rcsid);
+            udp_scan_version();
             exit(0);
             break;
          case 'd':	/* --debug */
@@ -221,10 +221,6 @@ main(int argc, char *argv[]) {
  *	Display initial message.
  */
    printf("Starting %s with %u hosts\n", PACKAGE_STRING, num_hosts);
-/*
- *	Call initialisation routine to perform any initial setup required.
- */
-   initialise();
 /*
  *	Display the lists if verbose setting is 3 or more.
  */
@@ -547,7 +543,7 @@ usage(void) {
    fprintf(stderr, "\t\t\tinstead of from the command line. One name or IP\n");
    fprintf(stderr, "\t\t\taddress per line.  Use \"-\" for standard input.\n");
    fprintf(stderr, "\n--sport=<p> or -s <p>\tSet UDP source port to <p>, default=%d, 0=random.\n", DEFAULT_SOURCE_PORT);
-   fprintf(stderr, "\n--dport=<p> or -p <p>\tSet UDP destination port to <p>, default=%d.\n", DEFAULT_DEST_PORT);
+   fprintf(stderr, "\n--dport=<p> or -p <p>\tSet UDP destination port to <p>, default=%d.\n", dest_port);
    fprintf(stderr, "\n--retry=<n> or -r <n>\tSet total number of attempts per host to <n>,\n");
    fprintf(stderr, "\t\t\tdefault=%d.\n", DEFAULT_RETRY);
    fprintf(stderr, "\n--timeout=<n> or -t <n>\tSet initial per host timeout to <n> ms, default=%d.\n", DEFAULT_TIMEOUT);
@@ -616,4 +612,15 @@ print_times(void) {
    }
    time_last.tv_sec  = time_now.tv_sec;
    time_last.tv_usec = time_now.tv_usec;
+}
+
+void
+udp_scan_version (void) {
+   fprintf(stderr, "%s\n\n", PACKAGE_STRING);
+   fprintf(stderr, "Copyright (C) 2003 Roy Hills, NTA Monitor Ltd.\n");
+   fprintf(stderr, "\n");
+/* We use rcsid here to prevent it being optimised away */
+   fprintf(stderr, "%s\n", rcsid);
+/* Call scanner-specific version routine */
+   local_version();
 }
