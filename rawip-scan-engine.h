@@ -93,8 +93,6 @@
 
 /* Structures */
 struct host_entry {
-   struct host_entry *prev;	/* Previous pointer */
-   struct host_entry *next;	/* Next pointer */
    unsigned n;			/* Ordinal number for this entry */
    unsigned timeout;		/* Timeout for this host in us */
    struct in_addr addr;		/* Host IP address */
@@ -117,9 +115,9 @@ void usage(void);
 void add_host(char *, unsigned);
 void send_packet(int, struct host_entry *, int, struct timeval *);
 void recvfrom_wto(int, unsigned char *, int, struct sockaddr *, int);
-void remove_host(struct host_entry *);
+void remove_host(struct host_entry **);
 void timeval_diff(struct timeval *, struct timeval *, struct timeval *);
-struct host_entry *find_host(struct host_entry *, struct in_addr *,
+struct host_entry *find_host(struct host_entry **, struct in_addr *,
                              const unsigned char *, int);
 void display_packet(int, const unsigned char *, struct host_entry *,
                     struct in_addr *);
@@ -132,7 +130,7 @@ void rawip_scan_version(void);
 void local_version(void);
 void local_help(void);
 int local_add_host(char *, unsigned);
-int local_find_host(struct host_entry **, struct host_entry *,
+int local_find_host(struct host_entry **, struct host_entry **,
                     struct in_addr *, const unsigned char *, int);
 char *make_message(const char *, ...);
 char *printable(const unsigned char*, size_t);
