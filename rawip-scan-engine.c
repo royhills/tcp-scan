@@ -26,8 +26,9 @@
 static char const rcsid[] = "$Id$";	/* RCS ID for ident(1) */
 
 /* Global variables */
-struct host_entry *rrlist = NULL;	/* Round-robin linked list "the list" */
-struct host_entry *cursor;		/* Pointer to current list entry */
+struct host_entry *helist = NULL;	/* Array of host entries */
+struct host_entry **helistptr;		/* Array of pointers to host entries */
+struct host_entry **cursor;		/* Pointer to current host entry ptr */
 unsigned num_hosts = 0;			/* Number of entries in the list */
 unsigned responders = 0;		/* Number of hosts which responded */
 unsigned live_count;			/* Number of entries awaiting reply */
@@ -39,6 +40,7 @@ pcap_t *handle;
 int pcap_fd;				/* Pcap file descriptor */
 char filename[MAXLINE];
 int filename_flag=0;
+int random_flag=0;			/* Randomise the list */
 
 extern unsigned interval;		/* Desired interval between packets */
 extern char const scanner_name[];	/* Scanner Name */
@@ -74,6 +76,7 @@ main(int argc, char *argv[]) {
    static int pass_no;
    int first_timeout=1;
    const int on = 1;		/* For setsockopt */
+   int i;
 /*
  *	Open syslog channel and log arguments if required.
  *	We must be careful here to avoid overflowing the arg_str buffer
@@ -169,13 +172,38 @@ main(int argc, char *argv[]) {
  */
    if (!num_hosts)
       err_msg("No hosts to process.");
+/*
+ *	Create and initialise array of pointers to host entries.
+ */
+   helistptr = Malloc(num_hosts * sizeof(struct host_entry *));
+   for (i=0; i<num_hosts; i++)
+      helistptr[i] = &helist[i];
+/*
+ *	Randomise the list if required.
+ */
+   if (random_flag) {
+      unsigned seed;
+      struct timeval tv;
+      int r;
+      struct host_entry *temp;
 
+      Gettimeofday(&tv);
+      seed = tv.tv_usec ^ getpid();
+      srandom(seed);
+
+      for (i=num_hosts-1; i>0; i--) {
+         r = random() % (i+1);     /* Random number 0<=r<i */
+         temp = helistptr[i];
+         helistptr[i] = helistptr[r];
+         helistptr[r] = temp;
+      }
+   }
 /*
  *	Set current host pointer (cursor) to start of list, zero
  *	last packet sent time, and set last receive time to now.
  */
    live_count = num_hosts;
-   cursor = rrlist;
+   cursor = helistptr;
    last_packet_time.tv_sec=0;
    last_packet_time.tv_usec=0;
 /*
@@ -217,9 +245,9 @@ main(int argc, char *argv[]) {
  *	timeout for this host us ago, then we can potentially send a packet
  *	to it.
  */
-         timeval_diff(&now, &(cursor->last_send_time), &diff);
+         timeval_diff(&now, &((*cursor)->last_send_time), &diff);
          host_timediff = 1000000*diff.tv_sec + diff.tv_usec;
-         if (host_timediff >= cursor->timeout) {
+         if (host_timediff >= (*cursor)->timeout) {
             if (reset_cum_err) {
                if (debug) {print_times(); printf("main: Reset cum_err\n");}
                cum_err = 0;
@@ -233,7 +261,7 @@ main(int argc, char *argv[]) {
                   req_interval = 0;
                }
             }
-            if (debug) {print_times(); printf("main: Can send packet to host %d now.  host_timediff=%llu, timeout=%u, req_interval=%d, cum_err=%d\n", cursor->n, host_timediff, cursor->timeout, req_interval, cum_err);}
+            if (debug) {print_times(); printf("main: Can send packet to host %d now.  host_timediff=%llu, timeout=%u, req_interval=%d, cum_err=%d\n", (*cursor)->n, host_timediff, (*cursor)->timeout, req_interval, cum_err);}
             select_timeout = req_interval;
 /*
  *	If we've exceeded our retry limit, then this host has timed out so
@@ -241,36 +269,36 @@ main(int argc, char *argv[]) {
  *	backoff factor if this is not the first packet sent to this host
  *	and send a packet.
  */
-            if (verbose && cursor->num_sent > pass_no) {
+            if (verbose && (*cursor)->num_sent > pass_no) {
                warn_msg("---\tPass %d complete", pass_no+1);
-               pass_no = cursor->num_sent;
+               pass_no = (*cursor)->num_sent;
             }
-            if (cursor->num_sent >= retry) {
+            if ((*cursor)->num_sent >= retry) {
                if (verbose > 1)
-                  warn_msg("---\tRemoving host entry %u (%s) - Timeout", cursor->n, inet_ntoa(cursor->addr));
-               if (debug) {print_times(); printf("main: Timing out host %d.\n", cursor->n);}
+                  warn_msg("---\tRemoving host entry %u (%s) - Timeout", (*cursor)->n, inet_ntoa((*cursor)->addr));
+               if (debug) {print_times(); printf("main: Timing out host %d.\n", (*cursor)->n);}
                remove_host(cursor);	/* Automatically calls advance_cursor() */
                if (first_timeout) {
-                  timeval_diff(&now, &(cursor->last_send_time), &diff);
+                  timeval_diff(&now, &((*cursor)->last_send_time), &diff);
                   host_timediff = 1000000*diff.tv_sec + diff.tv_usec;
-                  while (host_timediff >= cursor->timeout && live_count) {
-                     if (cursor->live) {
+                  while (host_timediff >= (*cursor)->timeout && live_count) {
+                     if ((*cursor)->live) {
                         if (verbose > 1)
-                           warn_msg("---\tRemoving host %u (%s) - Catch-Up Timeout", cursor->n, inet_ntoa(cursor->addr));
+                           warn_msg("---\tRemoving host %u (%s) - Catch-Up Timeout", (*cursor)->n, inet_ntoa((*cursor)->addr));
                         remove_host(cursor);
                      } else {
                         advance_cursor();
                      }
-                     timeval_diff(&now, &(cursor->last_send_time), &diff);
+                     timeval_diff(&now, &((*cursor)->last_send_time), &diff);
                      host_timediff = 1000000*diff.tv_sec + diff.tv_usec;
                   }
                   first_timeout=0;
                }
                Gettimeofday(&last_packet_time);
             } else {	/* Retry limit not reached for this host */
-               if (cursor->num_sent)
-                  cursor->timeout *= backoff_factor;
-               send_packet(sockfd, cursor, ip_protocol, &last_packet_time);
+               if ((*cursor)->num_sent)
+                  (*cursor)->timeout *= backoff_factor;
+               send_packet(sockfd, *cursor, ip_protocol, &last_packet_time);
                advance_cursor();
             }
          } else {	/* We can't send a packet to this host yet */
@@ -278,9 +306,9 @@ main(int argc, char *argv[]) {
  *	Note that there is no point calling advance_cursor() here because if
  *	host n is not ready to send, then host n+1 will not be ready either.
  */
-            select_timeout = cursor->timeout - host_timediff;
+            select_timeout = (*cursor)->timeout - host_timediff;
             reset_cum_err = 1;	/* Zero cumulative error */
-            if (debug) {print_times(); printf("main: Can't send packet to host %d yet. host_timediff=%llu\n", cursor->n, host_timediff);}
+            if (debug) {print_times(); printf("main: Can't send packet to host %d yet. host_timediff=%llu\n", (*cursor)->n, host_timediff);}
          } /* End If */
       } else {		/* We can't send a packet yet */
          select_timeout = req_interval - loop_timediff;
@@ -321,6 +349,13 @@ main(int argc, char *argv[]) {
  *
  *	name = The Name or IP address of the host.
  *	timeout = The initial host timeout in ms.
+ *
+ *	Returns:
+ *
+ *	None.
+ *
+ *	This function is called before the helistptr array is created, so
+ *	we use the helist array directly.
  */
 void
 add_host(char *name, unsigned timeout) {
@@ -338,12 +373,12 @@ add_host(char *name, unsigned timeout) {
 
    num_hosts++;
 
-   if (rrlist)
-      rrlist=Realloc(rrlist, num_hosts * sizeof(struct host_entry));
+   if (helist)
+      helist=Realloc(helist, num_hosts * sizeof(struct host_entry));
    else
-      rrlist=Malloc(sizeof(struct host_entry));
+      helist=Malloc(sizeof(struct host_entry));
 
-   he = rrlist + (num_hosts-1);	/* Would array notation be better? */
+   he = helist + (num_hosts-1);	/* Would array notation be better? */
 
    Gettimeofday(&now);
 
@@ -368,9 +403,9 @@ add_host(char *name, unsigned timeout) {
  *	function updates cursor so that it points to the next entry.
  */
 void
-remove_host(struct host_entry *he) {
-   if (he->live) {
-      he->live = 0;
+remove_host(struct host_entry **he) {
+   if ((*he)->live) {
+      (*he)->live = 0;
       live_count--;
       if (he == cursor)
          advance_cursor();
@@ -394,13 +429,13 @@ void
 advance_cursor(void) {
    if (live_count) {
       do {
-         if (cursor == (rrlist+(num_hosts-1)))
-            cursor = rrlist;	/* Wrap round to beginning */
+         if (cursor == (helistptr+(num_hosts-1)))
+            cursor = helistptr;	/* Wrap round to beginning */
          else
             cursor++;
-      } while (!cursor->live);
+      } while (!(*cursor)->live);
    } /* End If */
-   if (debug) {print_times(); printf("advance_cursor: cursor now %d\n", cursor->n);}
+   if (debug) {print_times(); printf("advance_cursor: cursor now %d\n", (*cursor)->n);}
 }
 
 /*
@@ -425,28 +460,29 @@ advance_cursor(void) {
  *	and "n".
  */
 struct host_entry *
-find_host(struct host_entry *he, struct in_addr *addr,
+find_host(struct host_entry **he, struct in_addr *addr,
           const unsigned char *packet_in, int n) {
-   struct host_entry *p;
+   struct host_entry **p;
+   struct host_entry *ptr;
    int found = 0;
    unsigned iterations = 0;	/* Used for debugging */
 /*
  *	Return with the result from local_find_host if the local find_host
  *	function replaces this one.
  */
-   if (local_find_host(&p, he, addr, packet_in, n)) {
-      return p;
+   if (local_find_host(&ptr, he, addr, packet_in, n)) {
+      return ptr;
    }
 
    p = he;
 
    do {
       iterations++;
-      if (p->addr.s_addr == addr->s_addr) {
+      if ((*p)->addr.s_addr == addr->s_addr) {
          found = 1;
       } else {
-         if (p == rrlist) {
-            p = rrlist + (num_hosts-1);	/* Wrap round to end */
+         if (p == helistptr) {
+            p = helistptr + (num_hosts-1);	/* Wrap round to end */
          } else {
             p--;
          }
@@ -456,7 +492,7 @@ find_host(struct host_entry *he, struct in_addr *addr,
    if (debug) {print_times(); printf("find_host: found=%d, iterations=%u\n", found, iterations);}
 
    if (found)
-      return p;
+      return *p;
    else
       return NULL;
 }
@@ -541,7 +577,7 @@ dump_list(void) {
    printf("Host List:\n\n");
    printf("Entry\tIP Address\n");
    for (i=0; i<num_hosts; i++)
-      printf("%u\t%s\n", rrlist[i].n, inet_ntoa(rrlist[i].addr));
+      printf("%u\t%s\n", helistptr[i]->n, inet_ntoa(helistptr[i]->addr));
    printf("\nTotal of %u host entries.\n\n", num_hosts);
 }
 
@@ -589,6 +625,7 @@ usage(void) {
    fprintf(stderr, "\t\t\t3 - Display the host list before\n");
    fprintf(stderr, "\t\t\t    scanning starts.\n");
    fprintf(stderr, "\n--version or -V\t\tDisplay program version and exit.\n");
+   fprintf(stderr, "\n--random or -R\t\tRandomise the host list.\n");
 /* Call scanner-specific help function */
    local_help();
    fprintf(stderr, "\n");
@@ -807,6 +844,7 @@ process_options(int argc, char *argv[]) {
       {"version", no_argument, 0, 'V'},
       {"debug", no_argument, 0, 'd'},
       {"data", required_argument, 0, 'D'},
+      {"random", no_argument, 0, 'R'},
       {0, 0, 0, 0}
    };
    const char *short_options = "f:hp:r:t:i:b:vVdD:";
@@ -856,6 +894,9 @@ process_options(int argc, char *argv[]) {
          case 'D':	/* --data */
             local_data = Malloc(strlen(optarg)+1);
             strcpy(local_data, optarg);
+            break;
+         case 'R':      /* --random */
+            random_flag=1;
             break;
          default:	/* Unknown option */
             usage();
