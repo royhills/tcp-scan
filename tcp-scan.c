@@ -547,6 +547,7 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    iph->version = 4;
    iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr);
    iph->id = 0;		/* Linux kernel fills this in */
+   iph->frag_off = htons(0x4000);	/* Don't fragment */
    iph->ttl = ip_ttl;
    iph->protocol = ip_protocol;
    iph->check = 0;	/* Linux kernel fills this in */
