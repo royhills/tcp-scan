@@ -181,7 +181,7 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
       flags=make_message("");	/* Ensure flags not null if no TCP flags set */
    cp = msg;
    msg = make_message("%sflags=%s win=%u ttl=%u id=%u len=%d",
-                      cp, flags, tcph->window, iph->ttl, iph->id, n);
+                      cp, flags, tcph->window, iph->ttl, iph->id, n-ip_offset);
    free(cp);
    free(flags);
 /*
