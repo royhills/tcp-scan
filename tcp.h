@@ -80,6 +80,8 @@ struct tcphdr
 #  define TH_PUSH	0x08
 #  define TH_ACK	0x10
 #  define TH_URG	0x20
+#  define TH_ECN	0x40
+#  define TH_CWR	0x80
     u_int16_t th_win;		/* window */
     u_int16_t th_sum;		/* checksum */
     u_int16_t th_urp;		/* urgent pointer */
@@ -101,11 +103,13 @@ struct tcphdr
     u_int16_t psh:1;
     u_int16_t ack:1;
     u_int16_t urg:1;
-    u_int16_t res2:2;
+    u_int16_t ecn:1;
+    u_int16_t cwr:1;
 #  elif __BYTE_ORDER == __BIG_ENDIAN
     u_int16_t doff:4;
     u_int16_t res1:4;
-    u_int16_t res2:2;
+    u_int16_t cwr:1;
+    u_int16_t ecn:1;
     u_int16_t urg:1;
     u_int16_t ack:1;
     u_int16_t psh:1;
