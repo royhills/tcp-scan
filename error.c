@@ -1,10 +1,10 @@
 /*
- * The SQL Slammer Scanner (sql-slammer-scan) is Copyright (C) 2003 Roy Hills,
+ * The UDP Scan Engine (udp-scan-engine) is Copyright (C) 2003 Roy Hills,
  * NTA Monitor Ltd.
  *
  * $Id$
  *
- * error.c -- error routines for SQL Slammer Scanner (sql-slammer-scan)
+ * error.c -- error routines for UDP Scan Engine
  *
  * Author:	Roy Hills
  * Date:	1 December 2001
