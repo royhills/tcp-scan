@@ -384,6 +384,14 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
       free(cp);
    }
 /*
+ *	If the host entry is not live, then flag this as a duplicate.
+ */
+   if (!he->live) {
+      cp = msg;
+      msg = make_message("%s (DUP!)", cp);
+      free(cp);
+   }
+/*
  *	Print the message.
  */
    printf("%s\n", msg);
@@ -1104,32 +1112,32 @@ callback(u_char *args, const struct pcap_pkthdr *header,
  *	Note: We start at cursor->prev because we call advance_cursor() after
  *	      each send_packet().
  */
-         temp_cursor=find_host(cursor->prev, &source_ip, packet_in, n);
-         if (temp_cursor) {
+   temp_cursor=find_host(cursor->prev, &source_ip, packet_in, n);
+   if (temp_cursor) {
 /*
  *	We found an IP match for the packet. 
  */
-            if (verbose > 1)
-               warn_msg("---\tReceived packet #%u from %s",temp_cursor->num_recv ,inet_ntoa(source_ip));
+      if (verbose > 1)
+         warn_msg("---\tReceived packet #%u from %s",temp_cursor->num_recv ,inet_ntoa(source_ip));
  /*
   *	Display the packet and increment the number of responders if we are
   *	counting all packets (open_only == 0) or if SYN and ACK are set.
   */
-            if (!open_only || (tcph->syn && tcph->ack)) {
-               display_packet(n, packet_in, temp_cursor, &source_ip);
-               responders++;
-            }
-            if (verbose > 1)
-               warn_msg("---\tRemoving host entry %u (%s) - Received %d bytes", temp_cursor->n, inet_ntoa(source_ip), n);
-            remove_host(temp_cursor);
-         } else {
+      if (!open_only || (tcph->syn && tcph->ack)) {
+         display_packet(n, packet_in, temp_cursor, &source_ip);
+         responders++;
+      }
+      if (verbose > 1)
+         warn_msg("---\tRemoving host entry %u (%s) - Received %d bytes", temp_cursor->n, inet_ntoa(source_ip), n);
+      remove_host(temp_cursor);
+   } else {
 /*
  *	The received packet is not from an IP address in the list
  *	Issue a message to that effect and ignore the packet.
  */
-            if (verbose)
-               warn_msg("---\tIgnoring %d bytes from unknown host %s", n, inet_ntoa(source_ip));
-         }
+      if (verbose)
+         warn_msg("---\tIgnoring %d bytes from unknown host %s", n, inet_ntoa(source_ip));
+   }
 }
 
 /*
