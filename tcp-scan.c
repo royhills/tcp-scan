@@ -41,6 +41,8 @@ int open_only=0;			/* Only show open ports? */
 int wscale_flag=0;			/* Add wscale=0 TCP option? */
 int sack_flag=0;			/* Add SACKOK TCP option? */
 int timestamp_flag=0;			/* Add TIMESTAMP TCP option? */
+int ip_ttl = DEFAULT_TTL;		/* IP TTL */
+char *if_name=NULL;			/* Interface name, e.g. "eth0" */
 char const scanner_name[] = "tcp-scan";
 char const scanner_version[] = "1.6";
 
@@ -541,7 +543,7 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    iph->version = 4;
    iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr);
    iph->id = 0;		/* Linux kernel fills this in */
-   iph->ttl = 64;
+   iph->ttl = ip_ttl;
    iph->protocol = ip_protocol;
    iph->check = 0;	/* Linux kernel fills this in */
    iph->saddr = source_address;
@@ -585,7 +587,6 @@ initialise(void) {
    struct utsname uname_buf;
    char str[MAXLINE];
    md5_byte_t md5_digest[16];		/* MD5 hash used as random source */
-   char *if_name;			/* Interface name, e.g. "eth0" */
    char errbuf[PCAP_ERRBUF_SIZE];
    struct bpf_program filter;
    char *filter_string;
@@ -623,9 +624,14 @@ initialise(void) {
    }
 /*
  *	Determine source interface and associated IP address.
+ *	If the interface was specified with the --interface option then use
+ *	that, otherwise if the environment variable "RMIF" exists then use
+ *	that, failing that default to "eth0".
  */
-   if (!(if_name=getenv("RMIF")))
-      if_name="eth0";
+   if (!if_name) {
+      if (!(if_name=getenv("RMIF")))
+         if_name="eth0";
+   }
    source_address = get_source_ip(if_name);
 /*
  *	Prepare pcap
@@ -753,8 +759,22 @@ local_help(void) {
    fprintf(stderr, "\t\t\tit does not increase packet size when used with the\n");
    fprintf(stderr, "\t\t\t--timestamp option.\n");
    fprintf(stderr, "\n--timestamp or -T\tAdd the TIMESTAMP TCP option\n");
+   fprintf(stderr, "\t\t\tThe number of seconds since midnight 1/1/1970 is used\n");
+   fprintf(stderr, "\t\t\tfor the timestamp value.\n");
    fprintf(stderr, "\t\t\tThis option adds 12 bytes to the packet length.\n");
    fprintf(stderr, "\n--snap=<s> or -n <s>\tSet the pcap snap length to <s>. Default=%d.\n", SNAPLEN);
+   fprintf(stderr, "\t\t\tThis specifies the frame capture length.  This\n");
+   fprintf(stderr, "\t\t\tlength includes the data-link header as well as the\n");
+   fprintf(stderr, "\t\t\tIP and transport headers.  The default is normally\n");
+   fprintf(stderr, "\t\t\tsufficient.\n");
+   fprintf(stderr, "\n--ttl=<t> or -l <t>\tSet the IP TTL to <t>. Default=%d.\n", DEFAULT_TTL);
+   fprintf(stderr, "\t\t\tYou can specify a higher value if the targets are\n");
+   fprintf(stderr, "\t\t\tmany hops away, or you can specify a lower value to\n");
+   fprintf(stderr, "\t\t\tlimit the scope to the local network.\n");
+   fprintf(stderr, "\n--interface=<i> or -I <u> Use network interface <i>.\n");
+   fprintf(stderr, "\t\t\tIf this option is not specified, the default is the\n");
+   fprintf(stderr, "\t\t\tvalue of the RMIF environment variable.  If RMIF is\n");
+   fprintf(stderr, "\t\t\tnot defined, then \"eth0\" is used as a last resort.\n");
 }
 
 /*
@@ -1183,9 +1203,11 @@ local_process_options(int argc, char *argv[]) {
       {"sack", no_argument, 0, 'a'},
       {"timestamp", no_argument, 0, 'T'},
       {"snap", required_argument, 0, 'n'},
+      {"ttl", required_argument, 0, 'l'},
+      {"interface", required_argument, 0, 'I'},
       {0, 0, 0, 0}
    };
-   const char *short_options = "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:WaTn:";
+   const char *short_options = "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:WaTn:l:I:";
    int arg;
    int options_index=0;
 
@@ -1258,6 +1280,14 @@ local_process_options(int argc, char *argv[]) {
             break;
          case 'n':	/* --snap */
             snaplen=strtol(optarg, (char **)NULL, 0);
+            break;
+         case 'l':	/* --ttl */
+            ip_ttl=strtol(optarg, (char **)NULL, 0);
+            if (ip_ttl < 0 || ip_ttl > 255)
+               err_msg("The --ttl option must be in the range 0 to 255.");
+            break;
+         case 'I':	/* --interface */
+            if_name = make_message("%s", optarg);
             break;
          default:	/* Unknown option */
             usage();
