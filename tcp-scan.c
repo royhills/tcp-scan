@@ -333,7 +333,6 @@ initialise(void) {
    bpf_u_int32 netmask;
    bpf_u_int32 localnet;
    int datalink;
-
 /*
  *	Create an MD5 hash of various things to use as a source of random
  *	data.
@@ -368,9 +367,6 @@ initialise(void) {
 /*
  *	Prepare pcap
  */
-   filter_string=make_message("tcp dst port %u and tcp[8:4] = %u",
-                              source_port, seq_no+1);
-   printf("Filter string: \"%s\"\n", filter_string);
    if (!(handle = pcap_open_live(if_name, SNAPLEN, PROMISC, TO_MS, errbuf)))
       err_msg("pcap_open_live: %s\n", errbuf);
    if ((datalink=pcap_datalink(handle)) < 0)
@@ -395,8 +391,11 @@ initialise(void) {
       err_msg("pcap_setnonblock: %s\n", errbuf);
    if (pcap_lookupnet(if_name, &localnet, &netmask, errbuf) < 0)
       err_msg("pcap_lookupnet: %s\n", errbuf);
+   filter_string=make_message("tcp dst port %u and tcp[8:4] = %u",
+                              source_port, seq_no+1);
    if ((pcap_compile(handle, &filter, filter_string, OPTIMISE, netmask)) < 0)
       err_msg("pcap_geterr: %s\n", pcap_geterr(handle));
+   free(filter_string);
    if ((pcap_setfilter(handle, &filter)) < 0)
       err_msg("pcap_setfilter: %s\n", pcap_geterr(handle));
 }
