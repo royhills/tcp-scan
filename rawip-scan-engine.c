@@ -306,8 +306,11 @@ main(int argc, char *argv[]) {
  *	Note: If the protocol includes a unique ID with a large enough range
  *	      i.e. 32 bits or more, we could match by that instead of IP
  *	      address.  We do this with ike-scan using the 64-bit cookie value.
+ *
+ *	Note: We start at cursor->prev because we call advance_cursor() after
+ *	      each send_packet().
  */
-         temp_cursor=find_host_by_ip(cursor, &(sa_peer.sin_addr));
+         temp_cursor=find_host_by_ip(cursor->prev, &(sa_peer.sin_addr));
          if (temp_cursor) {
 /*
  *	We found an IP match for the packet. 
@@ -440,9 +443,9 @@ advance_cursor(void) {
  *
  *	Inputs:
  *
- *	he = Pointer to the current position in the list.  Search runs
- *	     backwards starting from this point.
- *	addr = The IP address to find.
+ *	he =	Pointer to the current position in the list.  Search runs
+ *		backwards starting from this point.
+ *	addr =	The IP address to find.
  *
  *	Returns a pointer to the host entry associated with the specified IP
  *	or NULL if no match found.
@@ -450,24 +453,25 @@ advance_cursor(void) {
 struct host_entry *
 find_host_by_ip(struct host_entry *he,struct in_addr *addr) {
    struct host_entry *p;
-   int found;
+   int found = 0;
+   unsigned iterations = 0;	/* Used for debugging */
 
    p = he;
-   found = 0;
 
    do {
-      if (p->addr.s_addr == addr->s_addr) {
+      iterations++;
+      if (p->addr.s_addr == addr->s_addr)
          found = 1;
-      } else {
+      else
          p = p->prev;
-      }
    } while (!found && p != he);
 
-   if (found) {
+   if (debug) {print_times(); printf("find_host_by_ip: found=%d, iterations=%u\n", found, iterations);}
+
+   if (found)
       return p;
-   } else {
+   else
       return NULL;
-   }
 }
 
 /*
