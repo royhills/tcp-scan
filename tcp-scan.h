@@ -42,3 +42,4 @@ struct tcp_data {
 unsigned int hstr_i(char *);
 uint16_t in_cksum(uint16_t *, int);
 uint32_t get_source_ip(char *);
+void add_host_port(char *, unsigned, unsigned);
