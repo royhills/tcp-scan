@@ -318,3 +318,33 @@ unsigned int hstr_i(char *cptr)
       }
       return(j);
 }
+
+/*
+ *	local_find_host -- Protocol-specific find host routine.
+ *
+ *	Inputs:
+ *
+ *	ptr	Pointer to the host entry that was found, or NULL if not found
+ *      he      Pointer to the current position in the list.  Search runs
+ *              backwards starting from this point.
+ *      addr    The source IP address that the packet came from.
+ *      packet_in The received packet data.
+ *      n       The length of the received packet.
+ *
+ *	Returns:
+ *
+ *	0 (Zero) if this function doesn't need to do anything, or
+ *	1 (One) if this function replaces the generic add_host function.
+ *
+ *	This routine is called every time a packet is received.
+ *
+ *	This protocol-specific find host routine can replace the generic
+ *	rawip-scan find-host routine if required.  If it is to replace the
+ *	generic routine, then it must perform all of the find_host functions
+ *	and return 1.  Otherwise, it must do nothing and return 0.
+ */
+int
+local_find_host(struct host_entry **ptr, struct host_entry *he,
+                struct in_addr *addr, unsigned char *packet_in, int n) {
+   return 0;
+}
