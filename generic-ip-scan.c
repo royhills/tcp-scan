@@ -256,6 +256,8 @@ local_version(void) {
 void
 local_help(void) {
    fprintf(stderr, "\n--data=<d> or -D <d>\tSpecify packet contents in hex.\n");
+   fprintf(stderr, "\t\t\tE.g. --data=deadbeef would specify the 4-byte UDP\n");
+   fprintf(stderr, "\t\t\tpayload: 0xde, 0xad, 0xbe, 0xef.\n");
 }
 
 /*
