@@ -11,7 +11,7 @@
  *
  */
 
-#include "udp-scan-engine.h"
+#include "rawip-scan-engine.h"
 
 int daemon_proc;	/* Non-zero if process is a daemon */
 
