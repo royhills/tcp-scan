@@ -181,7 +181,8 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
       flags=make_message("");	/* Ensure flags not null if no TCP flags set */
    cp = msg;
    msg = make_message("%sflags=%s win=%u ttl=%u id=%u len=%d",
-                      cp, flags, tcph->window, iph->ttl, iph->id, n-ip_offset);
+                      cp, flags, tcph->window, iph->ttl, iph->id,
+                      ntohs(iph->tot_len));
    free(cp);
    free(flags);
 /*
@@ -761,7 +762,6 @@ callback(u_char *args, const struct pcap_pkthdr *header,
    int n = header->caplen;
    struct in_addr source_ip;
    struct host_entry *temp_cursor;
-
 /*
  *      Check that the packet is large enough to decode.
  */
