@@ -43,6 +43,8 @@ int sack_flag=0;			/* Add SACKOK TCP option? */
 int timestamp_flag=0;			/* Add TIMESTAMP TCP option? */
 int ip_ttl = DEFAULT_TTL;		/* IP TTL */
 char *if_name=NULL;			/* Interface name, e.g. "eth0" */
+int quiet_flag=0;			/* Don't decode the packet */
+int ignore_dups=0;			/* Don't display duplicate packets */
 char const scanner_name[] = "tcp-scan";
 char const scanner_version[] = "1.6";
 
@@ -135,264 +137,266 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
  */
    cp = msg;
    if (tcph->syn && tcph->ack) {	/* SYN + ACK = Open */
-      msg = make_message("%sOPEN\t", cp);
+      msg = make_message("%sOPEN", cp);
    } else if (tcph->rst) {		/* RST = Closed */
-      msg = make_message("%sCLOSED\t", cp);
+      msg = make_message("%sCLOSED", cp);
    } else {				/* Shouldn't happen */
-      msg = make_message("%sUNKNOWN\t", cp);
+      msg = make_message("%sUNKNOWN", cp);
    }
    free(cp);
+   if (!quiet_flag) {
 /*
  *	Add DF, TCP Flags, TTL, IPIP, and IP packet length to the message.
  */
-   flags = NULL;
-   if (tcph->cwr) {
-      if (flags) {
-         cp = flags;
-         flags = make_message("%s,CWR", cp);
-         free(cp);
-      } else {
-         flags = make_message("CWR");
+      flags = NULL;
+      if (tcph->cwr) {
+         if (flags) {
+            cp = flags;
+            flags = make_message("%s,CWR", cp);
+            free(cp);
+         } else {
+            flags = make_message("CWR");
+         }
       }
-   }
-   if (tcph->ecn) {
-      if (flags) {
-         cp = flags;
-         flags = make_message("%s,ECN", cp);
-         free(cp);
-      } else {
-         flags = make_message("ECN");
+      if (tcph->ecn) {
+         if (flags) {
+            cp = flags;
+            flags = make_message("%s,ECN", cp);
+            free(cp);
+         } else {
+            flags = make_message("ECN");
+         }
       }
-   }
-   if (tcph->urg) {
-      if (flags) {
-         cp = flags;
-         flags = make_message("%s,URG", cp);
-         free(cp);
-      } else {
-         flags = make_message("URG");
+      if (tcph->urg) {
+         if (flags) {
+            cp = flags;
+            flags = make_message("%s,URG", cp);
+            free(cp);
+         } else {
+            flags = make_message("URG");
+         }
       }
-   }
-   if (tcph->ack) {
-      if (flags) {
-         cp = flags;
-         flags = make_message("%s,ACK", cp);
-         free(cp);
-      } else {
-         flags = make_message("ACK");
+      if (tcph->ack) {
+         if (flags) {
+            cp = flags;
+            flags = make_message("%s,ACK", cp);
+            free(cp);
+         } else {
+            flags = make_message("ACK");
+         }
       }
-   }
-   if (tcph->psh) {
-      if (flags) {
-         cp = flags;
-         flags = make_message("%s,PSH", cp);
-         free(cp);
-      } else {
-         flags = make_message("PSH");
+      if (tcph->psh) {
+         if (flags) {
+            cp = flags;
+            flags = make_message("%s,PSH", cp);
+            free(cp);
+         } else {
+            flags = make_message("PSH");
+         }
       }
-   }
-   if (tcph->rst) {
-      if (flags) {
-         cp = flags;
-         flags = make_message("%s,RST", cp);
-         free(cp);
-      } else {
-         flags = make_message("RST");
+      if (tcph->rst) {
+         if (flags) {
+            cp = flags;
+            flags = make_message("%s,RST", cp);
+            free(cp);
+         } else {
+            flags = make_message("RST");
+         }
       }
-   }
-   if (tcph->syn) {
-      if (flags) {
-         cp = flags;
-         flags = make_message("%s,SYN", cp);
-         free(cp);
-      } else {
-         flags = make_message("SYN");
+      if (tcph->syn) {
+         if (flags) {
+            cp = flags;
+            flags = make_message("%s,SYN", cp);
+            free(cp);
+         } else {
+            flags = make_message("SYN");
+         }
       }
-   }
-   if (tcph->fin) {
-      if (flags) {
-         cp = flags;
-         flags = make_message("%s,FIN", cp);
-         free(cp);
-      } else {
-         flags = make_message("FIN");
+      if (tcph->fin) {
+         if (flags) {
+            cp = flags;
+            flags = make_message("%s,FIN", cp);
+            free(cp);
+         } else {
+            flags = make_message("FIN");
+         }
       }
-   }
-   if (!flags)
-      flags=make_message("");	/* Ensure flags not NULL if no TCP flags set */
-   if (ntohs(iph->frag_off) & 0x4000) {	/* If DF flag set */
-      df = "yes";
-   } else {
-      df = "no";
-   }
-   cp = msg;
-   msg = make_message("%sDF=%s TOS=%u flags=%s win=%u ttl=%u id=%u ip_len=%d",
-                      cp, df, iph->tos, flags, ntohs(tcph->window), iph->ttl,
-                      ntohs(iph->id), ntohs(iph->tot_len));
-   free(cp);
-   free(flags);
+      if (!flags)
+         flags=make_message(""); /* Ensure flags not NULL if no TCP flags set */
+      if (ntohs(iph->frag_off) & 0x4000) {	/* If DF flag set */
+         df = "yes";
+      } else {
+         df = "no";
+      }
+      cp = msg;
+      msg=make_message("%s\tDF=%s TOS=%u flags=%s win=%u ttl=%u id=%u ip_len=%d",
+                       cp, df, iph->tos, flags, ntohs(tcph->window), iph->ttl,
+                       ntohs(iph->id), ntohs(iph->tot_len));
+      free(cp);
+      free(flags);
 /*
  *	Determine TCP options.
  */
-   optlen = 4*(tcph->doff) - sizeof(struct tcphdr);
-   if (optlen) {
-      char *options=NULL;
-      int trunc=0;
-      unsigned char *optptr=(unsigned char *) (packet_in + ip_offset +
-                                               4*(iph->ihl) +
-                                               sizeof(struct tcphdr));
-      uint16_t *sptr;	/* 16-bit ptr - used for MSS */
-      uint32_t *lptr1;	/* 32-bit ptr - used for timestamp value */
-      uint32_t *lptr2;	/* 32-bit ptr - used for timestamp value */
-      unsigned char uc;
+      optlen = 4*(tcph->doff) - sizeof(struct tcphdr);
+      if (optlen) {
+         char *options=NULL;
+         int trunc=0;
+         unsigned char *optptr=(unsigned char *) (packet_in + ip_offset +
+                                                  4*(iph->ihl) +
+                                                  sizeof(struct tcphdr));
+         uint16_t *sptr;	/* 16-bit ptr - used for MSS */
+         uint32_t *lptr1;	/* 32-bit ptr - used for timestamp value */
+         uint32_t *lptr2;	/* 32-bit ptr - used for timestamp value */
+         unsigned char uc;
 /*
  *	Check if options have been truncated.
  */
-      if (n - ip_offset - sizeof(struct iphdr) - sizeof(struct tcphdr)
-          < optlen) {
-         if (verbose)
-            warn_msg("---\tCaptured packet length %d is too short for calculated TCP options length %d.  Adjusting options length", n, optlen);
-         optlen = n - ip_offset - sizeof(struct iphdr) - sizeof(struct tcphdr);
-         trunc=1;
-      }
-      if (ntohs(iph->tot_len) - sizeof(struct iphdr) - sizeof(struct tcphdr)
-          < optlen) {
-         if (verbose)
-            warn_msg("---\tClaimed IP packet length %d is too short for calculated TCP options length %d.  Adjusting options length", ntohs(iph->tot_len), optlen);
-         optlen = ntohs(iph->tot_len) - sizeof(struct iphdr) -
-                  sizeof(struct tcphdr);
-         trunc=1;
-      }
-
-      while (optlen > 0) {
-         switch (*optptr) {
-            case TCPOPT_EOL:
-               optlen--;
-               optptr++;
-               if (options) {
-                  cp = options;
-                  options = make_message("%s,EOL", cp);
-                  free(cp);
-               } else {
-                  options = make_message("EOL");
-               }
-               break;
-            case TCPOPT_NOP:
-               optlen--;
-               optptr++;
-               if (options) {
-                  cp = options;
-                  options = make_message("%s,NOP", cp);
-                  free(cp);
-               } else {
-                  options = make_message("NOP");
-               }
-               break;
-            case TCPOPT_MAXSEG:
-               optlen -= 4;
-               sptr = (uint16_t *) (optptr+2);
-               optptr += 4;
-               if (options) {
-                  cp = options;
-                  options = make_message("%s,MSS=%u", cp, ntohs(*sptr));
-                  free(cp);
-               } else {
-                  options = make_message("MSS=%u", ntohs(*sptr));
-               }
-               break;
-            case TCPOPT_WINDOW:
-               uc = *(optptr+2);
-               optlen -= 3;
-               optptr += 3;
-               if (options) {
-                  cp = options;
-                  options = make_message("%s,WSCALE=%u", cp, uc);
-                  free(cp);
-               } else {
-                  options = make_message("WSCALE=%u", uc);
-               }
-               break;
-            case TCPOPT_SACK_PERMITTED:
-               optlen -= 2;
-               optptr += 2;
-               if (options) {
-                  cp = options;
-                  options = make_message("%s,SACKOK", cp);
-                  free(cp);
-               } else {
-                  options = make_message("SACKOK");
-               }
-               break;
-            case TCPOPT_TIMESTAMP:
-               optlen -= 10;
-               lptr1 = (uint32_t *) (optptr+2);	/* TS Value */
-               lptr2 = (uint32_t *) (optptr+6);	/* TS Echo Reply */
-               optptr += 10;
-               if (options) {
-                  cp = options;
-                  options = make_message("%s,TIMESTAMP=%u,%u", cp,
-                                         ntohl(*lptr1), ntohl(*lptr2));
-                  free(cp);
-               } else {
-                  options = make_message("TIMESTAMP=%u,%u", ntohl(*lptr1),
-                                         ntohl(*lptr2));
-               }
-               break;
-            default:
-               uc = *optptr;
-               if (options) {
-                  cp = options;
-                  options = make_message("%s,opt-%u", cp, uc);
-                  free(cp);
-               } else {
-                  options = make_message("opt-%u", uc);
-               }
-               uc = *(optptr+1);
-               optlen -= uc;
-               optptr += uc;
-               break;
+         if (n - ip_offset - sizeof(struct iphdr) - sizeof(struct tcphdr)
+             < optlen) {
+            if (verbose)
+               warn_msg("---\tCaptured packet length %d is too short for calculated TCP options length %d.  Adjusting options length", n, optlen);
+            optlen = n - ip_offset - sizeof(struct iphdr) - sizeof(struct tcphdr);
+            trunc=1;
          }
+         if (ntohs(iph->tot_len) - sizeof(struct iphdr) - sizeof(struct tcphdr)
+             < optlen) {
+            if (verbose)
+               warn_msg("---\tClaimed IP packet length %d is too short for calculated TCP options length %d.  Adjusting options length", ntohs(iph->tot_len), optlen);
+            optlen = ntohs(iph->tot_len) - sizeof(struct iphdr) -
+                     sizeof(struct tcphdr);
+            trunc=1;
+         }
+
+         while (optlen > 0) {
+            switch (*optptr) {
+               case TCPOPT_EOL:
+                  optlen--;
+                  optptr++;
+                  if (options) {
+                     cp = options;
+                     options = make_message("%s,EOL", cp);
+                     free(cp);
+                  } else {
+                     options = make_message("EOL");
+                  }
+                  break;
+               case TCPOPT_NOP:
+                  optlen--;
+                  optptr++;
+                  if (options) {
+                     cp = options;
+                     options = make_message("%s,NOP", cp);
+                     free(cp);
+                  } else {
+                     options = make_message("NOP");
+                  }
+                  break;
+               case TCPOPT_MAXSEG:
+                  optlen -= 4;
+                  sptr = (uint16_t *) (optptr+2);
+                  optptr += 4;
+                  if (options) {
+                     cp = options;
+                     options = make_message("%s,MSS=%u", cp, ntohs(*sptr));
+                     free(cp);
+                  } else {
+                     options = make_message("MSS=%u", ntohs(*sptr));
+                  }
+                  break;
+               case TCPOPT_WINDOW:
+                  uc = *(optptr+2);
+                  optlen -= 3;
+                  optptr += 3;
+                  if (options) {
+                     cp = options;
+                     options = make_message("%s,WSCALE=%u", cp, uc);
+                     free(cp);
+                  } else {
+                     options = make_message("WSCALE=%u", uc);
+                  }
+                  break;
+               case TCPOPT_SACK_PERMITTED:
+                  optlen -= 2;
+                  optptr += 2;
+                  if (options) {
+                     cp = options;
+                     options = make_message("%s,SACKOK", cp);
+                     free(cp);
+                  } else {
+                     options = make_message("SACKOK");
+                  }
+                  break;
+               case TCPOPT_TIMESTAMP:
+                  optlen -= 10;
+                  lptr1 = (uint32_t *) (optptr+2);	/* TS Value */
+                  lptr2 = (uint32_t *) (optptr+6);	/* TS Echo Reply */
+                  optptr += 10;
+                  if (options) {
+                     cp = options;
+                     options = make_message("%s,TIMESTAMP=%u,%u", cp,
+                                            ntohl(*lptr1), ntohl(*lptr2));
+                     free(cp);
+                  } else {
+                     options = make_message("TIMESTAMP=%u,%u", ntohl(*lptr1),
+                                            ntohl(*lptr2));
+                  }
+                  break;
+               default:
+                  uc = *optptr;
+                  if (options) {
+                     cp = options;
+                     options = make_message("%s,opt-%u", cp, uc);
+                     free(cp);
+                  } else {
+                     options = make_message("opt-%u", uc);
+                  }
+                  uc = *(optptr+1);
+                  optlen -= uc;
+                  optptr += uc;
+                  break;
+            }
+         }
+         if (!options)
+            options=make_message("");	/* Ensure options not NULL */
+         cp = msg;
+         if (trunc) {
+            msg = make_message("%s <%s,...>", cp, options);
+         } else {
+            msg = make_message("%s <%s>", cp, options);
+         }
+         free(cp);
+         free(options);
       }
-      if (!options)
-         options=make_message("");	/* Ensure options not NULL */
-      cp = msg;
-      if (trunc) {
-         msg = make_message("%s <%s,...>", cp, options);
-      } else {
-         msg = make_message("%s <%s>", cp, options);
-      }
-      free(cp);
-      free(options);
-   }
 /*
  *	Determine length of TCP data.  If this is non-zero, then display the
  *	data.
  */
-   data_len = ntohs(iph->tot_len) - 4*(iph->ihl) - 4*(tcph->doff);
-   data_offset = ip_offset + 4*(iph->ihl) + 4*(tcph->doff);
-   if (data_len > 0) {
-      char *data_str;
+      data_len = ntohs(iph->tot_len) - 4*(iph->ihl) - 4*(tcph->doff);
+      data_offset = ip_offset + 4*(iph->ihl) + 4*(tcph->doff);
+      if (data_len > 0) {
+         char *data_str;
 
-      cp = msg;
-      if (n >= data_offset + data_len) {
-         data_str=printable(packet_in+data_offset, data_len);
-         msg = make_message("%s data_len=%d data=\"%s\"", cp, data_len,
-                            data_str);
-         free(data_str);
-      } else {
-         msg = make_message("%s data_len=%d data=(packet too short to decode)",
-                            cp, data_len);
+         cp = msg;
+         if (n >= data_offset + data_len) {
+            data_str=printable(packet_in+data_offset, data_len);
+            msg = make_message("%s data_len=%d data=\"%s\"", cp, data_len,
+                               data_str);
+            free(data_str);
+         } else {
+            msg = make_message("%s data_len=%d data=(packet too short to decode)",
+                               cp, data_len);
+         }
+         free(cp);
       }
-      free(cp);
-   }
 /*
  *	If the host entry is not live, then flag this as a duplicate.
  */
-   if (!he->live) {
-      cp = msg;
-      msg = make_message("%s (DUP: %u)", cp, he->num_recv);
-      free(cp);
-   }
+      if (!he->live) {
+         cp = msg;
+         msg = make_message("%s (DUP: %u)", cp, he->num_recv);
+         free(cp);
+      }
+   }	/* End if (!quiet_flag) */
 /*
  *	Print the message.
  */
@@ -775,6 +779,15 @@ local_help(void) {
    fprintf(stderr, "\t\t\tIf this option is not specified, the default is the\n");
    fprintf(stderr, "\t\t\tvalue of the RMIF environment variable.  If RMIF is\n");
    fprintf(stderr, "\t\t\tnot defined, then \"eth0\" is used as a last resort.\n");
+   fprintf(stderr, "\n--quiet or -q\t\tDon't decode the received packet.\n");
+   fprintf(stderr, "\t\t\tIf this option is specified, then only the minimum\n");
+   fprintf(stderr, "\t\t\tinformation is displayed.  This can be useful if you\n");
+   fprintf(stderr, "\t\t\tonly want to know if a port is open or not, or if\n");
+   fprintf(stderr, "\t\t\tstrange packets confuse the decoding process\n");
+   fprintf(stderr, "\n--ignoredups or -g\tDon't display duplicate packets.\n");
+   fprintf(stderr, "\t\t\tBy default, duplicate packets are displayed and flagged\n");
+   fprintf(stderr, "\t\t\twith \"(DUP: n)\" where n is the number of packets\n");
+   fprintf(stderr, "\t\t\treceived from that host so far.\n");
 }
 
 /*
@@ -1141,10 +1154,12 @@ callback(u_char *args, const struct pcap_pkthdr *header,
          warn_msg("---\tReceived packet #%u from %s",temp_cursor->num_recv ,inet_ntoa(source_ip));
 /*
  *	Display the packet and increment the number of responders if we are
- *	counting all packets (open_only == 0) or if SYN and ACK are set.
+ *	counting all packets (open_only == 0) or if SYN and ACK are set and
+ *	the entry is "live" or we are not ignoring duplicates.
  */
       temp_cursor->num_recv++;
-      if (!open_only || (tcph->syn && tcph->ack)) {
+      if ((!open_only || (tcph->syn && tcph->ack)) &&
+          (temp_cursor->live || !ignore_dups)) {
          display_packet(n, packet_in, temp_cursor, &source_ip);
          responders++;
       }
@@ -1205,9 +1220,11 @@ local_process_options(int argc, char *argv[]) {
       {"snap", required_argument, 0, 'n'},
       {"ttl", required_argument, 0, 'l'},
       {"interface", required_argument, 0, 'I'},
+      {"quiet", no_argument, 0, 'q'},
+      {"ignoredups", no_argument, 0, 'g'},
       {0, 0, 0, 0}
    };
-   const char *short_options = "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:WaTn:l:I:";
+   const char *short_options = "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:WaTn:l:I:qg";
    int arg;
    int options_index=0;
 
@@ -1288,6 +1305,12 @@ local_process_options(int argc, char *argv[]) {
             break;
          case 'I':	/* --interface */
             if_name = make_message("%s", optarg);
+            break;
+         case 'q':	/* --quiet */
+            quiet_flag=1;
+            break;
+         case 'g':	/* --ignoredups */
+            ignore_dups=1;
             break;
          default:	/* Unknown option */
             usage();
