@@ -26,7 +26,7 @@ static char const rcsid[] = "$Id$";   /* RCS ID for ident(1) */
 
 /* Global variables */
 int ip_protocol = DEFAULT_IP_PROTOCOL;	/* IP Protocol */
-unsigned interval = DEFAULT_INTERVAL;	/* Interval between packets */
+unsigned interval = 1000 * DEFAULT_INTERVAL;	/* Interval between packets */
 unsigned retry = DEFAULT_RETRY;		/* Number of retries */
 unsigned timeout = DEFAULT_TIMEOUT;	/* Per-host timeout */
 float backoff_factor = DEFAULT_BACKOFF_FACTOR;	/* Backoff factor */
@@ -1328,6 +1328,8 @@ local_process_options(int argc, char *argv[]) {
       switch (arg) {
          char *p1;
          char *p2;
+         char interval_str[MAXLINE];    /* --interval argument */
+         size_t interval_len;   /* --interval argument length */
 
          case 'f':	/* --file */
             strncpy(filename, optarg, MAXLINE);
@@ -1346,7 +1348,13 @@ local_process_options(int argc, char *argv[]) {
             timeout=atoi(optarg);
             break;
          case 'i':	/* --interval */
-            interval=atoi(optarg);
+            strncpy(interval_str, optarg, MAXLINE);
+            interval_len=strlen(interval_str);
+            if (interval_str[interval_len-1] == 'u') {
+               interval=strtoul(interval_str, (char **)NULL, 10);
+            } else {
+               interval=1000 * strtoul(interval_str, (char **)NULL, 10);
+            }
             break;
          case 'b':	/* --backoff */
             backoff_factor=atof(optarg);

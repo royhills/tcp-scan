@@ -230,7 +230,6 @@ main(int argc, char *argv[]) {
  *
  *	The loop exits when all hosts have either responded or timed out.
  */
-   interval *= 1000;	/* Convert from ms to us */
    reset_cum_err = 1;
    req_interval = interval;
    while (live_count) {
@@ -654,6 +653,8 @@ usage(void) {
    fprintf(stderr, "\n");
    fprintf(stderr, "\t\t\tWhere interval is in ms, packet_size is in bytes, and\n");
    fprintf(stderr, "\t\t\tbandwidth is in bits per second.\n");
+   fprintf(stderr, "\t\t\tThe interval specified is in milliseconds by default,\n");
+   fprintf(stderr, "\t\t\tor in microseconds if \"u\" is appended to the value.\n");
    fprintf(stderr, "\n--backoff=<b> or -b <b>\tSet timeout backoff factor to <b>, default=%.2f.\n", backoff_factor);
    fprintf(stderr, "\t\t\tThe per-host timeout is multiplied by this factor\n");
    fprintf(stderr, "\t\t\tafter each timeout.  So, if the number of retrys\n");
@@ -908,6 +909,9 @@ process_options(int argc, char *argv[]) {
 
    while ((arg=getopt_long_only(argc, argv, short_options, long_options, &options_index)) != -1) {
       switch (arg) {
+         char interval_str[MAXLINE];    /* --interval argument */
+         size_t interval_len;   /* --interval argument length */
+
          case 'f':	/* --file */
             strncpy(filename, optarg, MAXLINE);
             filename_flag=1;
@@ -925,7 +929,13 @@ process_options(int argc, char *argv[]) {
             timeout=atoi(optarg);
             break;
          case 'i':	/* --interval */
-            interval=atoi(optarg);
+            strncpy(interval_str, optarg, MAXLINE);
+            interval_len=strlen(interval_str);
+            if (interval_str[interval_len-1] == 'u') {
+               interval=strtoul(interval_str, (char **)NULL, 10);
+            } else {
+               interval=1000 * strtoul(interval_str, (char **)NULL, 10);
+            }
             break;
          case 'b':	/* --backoff */
             backoff_factor=atof(optarg);
