@@ -44,6 +44,7 @@ int timestamp_flag=0;			/* Add TIMESTAMP TCP option? */
 int ip_ttl = DEFAULT_TTL;		/* IP TTL */
 char *if_name=NULL;			/* Interface name, e.g. "eth0" */
 int quiet_flag=0;			/* Don't decode the packet */
+int random_flag=0;			/* Randomise the list */
 int ignore_dups=0;			/* Don't display duplicate packets */
 int df_flag=DEFAULT_DF;			/* IP DF Flag */
 int ip_tos=DEFAULT_TOS;			/* IP TOS Field */
@@ -802,6 +803,7 @@ local_help(void) {
    fprintf(stderr, "\n--tos=<n> or -O <n>\tSet IP TOS (Type of Service) to <n>. Default=%d\n", DEFAULT_TOS);
    fprintf(stderr, "\t\t\tThis sets the TOS value in the IP header for outbound\n");
    fprintf(stderr, "\t\t\tSYN packets.\n");
+/*   fprintf(stderr, "\n--random or -R\t\tRandomise the host list.\n"); */
 }
 
 /*
@@ -1238,9 +1240,10 @@ local_process_options(int argc, char *argv[]) {
       {"ignoredups", no_argument, 0, 'g'},
       {"df", required_argument, 0, 'F'},
       {"tos", required_argument, 0, 'O'},
+      {"random", no_argument, 0, 'R'},
       {0, 0, 0, 0}
    };
-   const char *short_options = "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:WaTn:l:I:qgF:O:";
+   const char *short_options = "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:WaTn:l:I:qgF:O:R";
    int arg;
    int options_index=0;
 
@@ -1337,6 +1340,9 @@ local_process_options(int argc, char *argv[]) {
             ip_tos = strtol(optarg, (char **)NULL, 0);
             if (ip_tos < 0 || ip_tos > 255)
                err_msg("The --tos option must be in the range 0 to 255.");
+            break;
+         case 'R':	/* --random */
+            random_flag=1;
             break;
          default:	/* Unknown option */
             usage();
