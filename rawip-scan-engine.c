@@ -169,6 +169,19 @@ main(int argc, char *argv[]) {
  */
    initialise();
 /*
+ *	Create raw IP socket and set IP_HDRINCL
+ */
+   if ((sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0)
+      err_sys("socket");
+   if ((setsockopt(sockfd, IPPROTO_IP, IP_HDRINCL, &on, sizeof(on))) != 0)
+      err_sys("setsockopt");
+/*
+ *	Drop privileges.
+ */
+   if ((setuid(getuid())) < 0) {
+      err_sys("setuid");
+   }
+/*
  *	If we're not reading from a file, then we must have some hosts
  *	given as command line arguments.
  */
@@ -214,13 +227,6 @@ main(int argc, char *argv[]) {
  */
    if (!num_hosts)
       err_msg("No hosts to process.");
-/*
- *	Create raw IP socket and set IP_HDRINCL
- */
-   if ((sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0)
-      err_sys("socket");
-   if ((setsockopt(sockfd, IPPROTO_IP, IP_HDRINCL, &on, sizeof(on))) != 0)
-      err_sys("setsockopt");
 
 /*
  *	Set current host pointer (cursor) to start of list, zero
