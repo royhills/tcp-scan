@@ -52,7 +52,7 @@ int tcp_flags_flag=0;			/* Specify outbound TCP flags */
 struct tcp_flags_struct tcp_flags;	/* Specified TCP flags */
 char **portnames=NULL;
 char const scanner_name[] = "tcp-scan";
-char const scanner_version[] = "1.10";
+char const scanner_version[] = "1.11";
 
 extern int verbose;	/* Verbose level */
 extern int debug;	/* Debug flag */
