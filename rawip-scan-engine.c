@@ -38,6 +38,7 @@ extern int dest_port;			/* UDP destination port */
 extern unsigned interval;		/* Interval between packets */
 extern unsigned select_timeout;		/* Select timeout */
 extern char const scanner_name[];	/* Scanner Name */
+extern char const scanner_version[];	/* Scanner Version */
 extern unsigned retry;			/* Number of retries */
 extern unsigned timeout;		/* Per-host timeout */
 extern float backoff_factor;		/* Backoff factor */
@@ -226,7 +227,8 @@ main(int argc, char *argv[]) {
 /*
  *	Display initial message.
  */
-   printf("Starting %s with %u hosts\n", PACKAGE_STRING, num_hosts);
+   printf("Starting %s %s (%s) with %u hosts\n", scanner_name, scanner_version,
+          PACKAGE_STRING, num_hosts);
 /*
  *	Display the lists if verbose setting is 3 or more.
  */
@@ -330,7 +332,8 @@ main(int argc, char *argv[]) {
 #ifdef SYSLOG
    info_syslog("Ending: %u hosts scanned. %u responded", num_hosts, responders);
 #endif
-   printf("Ending %s: %u hosts scanned.  %u responded\n", PACKAGE_STRING, num_hosts, responders);
+   printf("Ending %s %s (%s): %u hosts scanned.  %u responded\n", scanner_name,
+          scanner_version, PACKAGE_STRING, num_hosts, responders);
    if (debug) {print_times(); printf("main: End\n");}
    return(0);
 }
@@ -622,7 +625,7 @@ print_times(void) {
 
 void
 udp_scan_version (void) {
-   fprintf(stderr, "%s\n\n", PACKAGE_STRING);
+   fprintf(stderr, "%s %s (%s)\n\n", scanner_name, scanner_version, PACKAGE_STRING);
    fprintf(stderr, "Copyright (C) 2003 Roy Hills, NTA Monitor Ltd.\n");
    fprintf(stderr, "\n");
 /* We use rcsid here to prevent it being optimised away */
