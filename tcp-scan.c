@@ -44,24 +44,25 @@ int timestamp_flag=0;			/* Add TIMESTAMP TCP option? */
 int ip_ttl = DEFAULT_TTL;		/* IP TTL */
 char *if_name=NULL;			/* Interface name, e.g. "eth0" */
 int quiet_flag=0;			/* Don't decode the packet */
-int random_flag=0;			/* Randomise the list */
 int ignore_dups=0;			/* Don't display duplicate packets */
 int df_flag=DEFAULT_DF;			/* IP DF Flag */
 int ip_tos=DEFAULT_TOS;			/* IP TOS Field */
 char const scanner_name[] = "tcp-scan";
-char const scanner_version[] = "1.8";
+char const scanner_version[] = "1.9";
 
 extern int verbose;	/* Verbose level */
 extern int debug;	/* Debug flag */
 extern char *local_data;		/* Local data from --data option */
-extern struct host_entry *rrlist;	/* Round-robin linked list "the list" */
+extern struct host_entry *helist;	/* Array of host entries */
+struct host_entry **helistptr;		/* Array of pointers to host entries */
 extern unsigned num_hosts;		/* Number of entries in the list */
 extern unsigned max_iter;		/* Max iterations in find_host() */
 extern pcap_t *handle;
-extern struct host_entry *cursor;
+extern struct host_entry **cursor;
 extern unsigned responders;		/* Number of hosts which responded */
 extern char filename[MAXLINE];
 extern int filename_flag;
+extern int random_flag;			/* Randomise the list */
 
 static uint32_t source_address;
 extern int pcap_fd;			/* pcap File Descriptor */
@@ -801,7 +802,6 @@ local_help(void) {
    fprintf(stderr, "\n--tos=<n> or -O <n>\tSet IP TOS (Type of Service) to <n>. Default=%d\n", DEFAULT_TOS);
    fprintf(stderr, "\t\t\tThis sets the TOS value in the IP header for outbound\n");
    fprintf(stderr, "\t\t\tSYN packets.\n");
-/*   fprintf(stderr, "\n--random or -R\t\tRandomise the host list.\n"); */
 }
 
 /*
@@ -816,6 +816,9 @@ local_help(void) {
  *
  *      0 (Zero) if this function doesn't need to do anything, or
  *      1 (One) if this function replaces the generic add_host function.
+ *
+ *	This function is called before the helistptr array is created, so
+ *	we use the helist array directly.
  *
  *      This routine is called once for each specified host.
  *
@@ -896,12 +899,12 @@ add_host_port(char *name, unsigned timeout, unsigned port) {
 
    num_hosts++;
 
-   if (rrlist)
-      rrlist=Realloc(rrlist, num_hosts * sizeof(struct host_entry));
+   if (helist)
+      helist=Realloc(helist, num_hosts * sizeof(struct host_entry));
    else
-      rrlist=Malloc(sizeof(struct host_entry));
+      helist=Malloc(sizeof(struct host_entry));
 
-   he = rrlist + (num_hosts-1); /* Would array notation be better? */
+   he = helist + (num_hosts-1); /* Would array notation be better? */
 
    Gettimeofday(&now);
 
@@ -1022,11 +1025,11 @@ uint32_t get_source_ip(char *devname) {
  *	and return 1.  Otherwise, it must do nothing and return 0.
  */
 int
-local_find_host(struct host_entry **ptr, struct host_entry *he,
+local_find_host(struct host_entry **ptr, struct host_entry **he,
                 struct in_addr *addr, const unsigned char *packet_in, int n) {
    struct iphdr *iph;
    struct tcphdr *tcph;
-   struct host_entry *p;
+   struct host_entry **p;
    int found = 0;
    unsigned iterations = 0;     /* Used for debugging */
 /*
@@ -1048,7 +1051,7 @@ local_find_host(struct host_entry **ptr, struct host_entry *he,
  *      Don't try to match if host ptr is NULL.
  *      This should never happen, but we check just in case.
  */
-   if (he == NULL) {
+   if (*he == NULL) {
       *ptr = NULL;
       return 1;
    }
@@ -1058,12 +1061,12 @@ local_find_host(struct host_entry **ptr, struct host_entry *he,
    p = he;
    do {
       iterations++;
-      if ((p->addr.s_addr == addr->s_addr) &&
-          (ntohs(tcph->source) == p->dport)) {
+      if (((*p)->addr.s_addr == addr->s_addr) &&
+          (ntohs(tcph->source) == (*p)->dport)) {
          found = 1;
       } else {
-         if (p == rrlist) {
-            p = rrlist + (num_hosts-1); /* Wrap round to end */
+         if (p == helistptr) {
+            p = helistptr + (num_hosts-1); /* Wrap round to end */
          } else {
             p--;
          }
@@ -1076,7 +1079,7 @@ local_find_host(struct host_entry **ptr, struct host_entry *he,
       max_iter=iterations;
 
    if (found)
-      *ptr = p;
+      *ptr = *p;
    else
       *ptr = NULL;
 
@@ -1151,7 +1154,7 @@ callback(u_char *args, const struct pcap_pkthdr *header,
       }
       if (verbose > 1)
          warn_msg("---\tRemoving host entry %u (%s) - Received %d bytes", temp_cursor->n, inet_ntoa(source_ip), n);
-      remove_host(temp_cursor);
+      remove_host(&temp_cursor);
    } else {
 /*
  *	The received packet is not from an IP address in the list
