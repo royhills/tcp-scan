@@ -31,9 +31,13 @@ unsigned retry = DEFAULT_RETRY;		/* Number of retries */
 unsigned timeout = DEFAULT_TIMEOUT;	/* Per-host timeout */
 float backoff_factor = DEFAULT_BACKOFF_FACTOR;	/* Backoff factor */
 uint32_t seq_no;			/* Initial TCP sequence number */
+int seq_no_flag=0;
 uint16_t source_port;			/* TCP Source Port */
+int source_port_flag=0;
+uint16_t window=DEFAULT_WINDOW;		/* TCP Window size */
+int open_only=0;			/* Only show open ports? */
 char const scanner_name[] = "tcp-scan";
-char const scanner_version[] = "1.2";
+char const scanner_version[] = "1.3";
 
 extern int verbose;	/* Verbose level */
 extern int debug;	/* Debug flag */
@@ -44,6 +48,8 @@ extern unsigned max_iter;		/* Max iterations in find_host() */
 extern pcap_t *handle;
 extern struct host_entry *cursor;
 extern unsigned responders;		/* Number of hosts which responded */
+extern char filename[MAXLINE];
+extern int filename_flag;
 
 static uint32_t source_address;
 extern int pcap_fd;			/* pcap File Descriptor */
@@ -128,6 +134,24 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
  *	Add TCP Flags, TTL, IPIP, and IP packet length to the message.
  */
    flags = NULL;
+   if (tcph->cwr) {
+      if (flags) {
+         cp = flags;
+         flags = make_message("%s,CWR", cp);
+         free(cp);
+      } else {
+         flags = make_message("CWR");
+      }
+   }
+   if (tcph->ecn) {
+      if (flags) {
+         cp = flags;
+         flags = make_message("%s,ECN", cp);
+         free(cp);
+      } else {
+         flags = make_message("ECN");
+      }
+   }
    if (tcph->urg) {
       if (flags) {
          cp = flags;
@@ -186,7 +210,7 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
       flags=make_message("");	/* Ensure flags not null if no TCP flags set */
    cp = msg;
    msg = make_message("%sflags=%s win=%u ttl=%u id=%u ip_len=%d",
-                      cp, flags, tcph->window, iph->ttl, iph->id,
+                      cp, flags, ntohs(tcph->window), iph->ttl, ntohs(iph->id),
                       ntohs(iph->tot_len));
    free(cp);
    free(flags);
@@ -289,7 +313,7 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    tcph->seq = htonl(seq_no);
    tcph->doff = 5;	/* 5 * 32bit longwords */
    tcph->syn = 1;
-   tcph->window = htons(5840);
+   tcph->window = htons(window);
    tcph->check = in_cksum((uint16_t *)pseudo, sizeof(struct pseudo_hdr) +
                  sizeof(struct tcphdr));
 /*
@@ -376,14 +400,18 @@ initialise(void) {
    md5_append(&context, (const md5_byte_t *)str, strlen(str));
    md5_finish(&context, md5_digest);
 /*
- *	Set the sequence number and source port using the MD5 hash.
+ *	Set the sequence number and source port using the MD5 hash
+ *	if they have not been set with command line options.
  *	We set the top bit of source port to make sure that it's
  *	above 32768 and therefore out of the way of reserved ports
  *	(1-1024).
  */
-   memcpy(&seq_no, md5_digest, sizeof(uint32_t));
-   memcpy(&source_port, md5_digest+sizeof(uint32_t), sizeof(uint16_t));
-   source_port |= 0x8000;
+   if (!seq_no_flag)
+      memcpy(&seq_no, md5_digest, sizeof(uint32_t));
+   if (!source_port_flag) {
+      memcpy(&source_port, md5_digest+sizeof(uint32_t), sizeof(uint16_t));
+      source_port |= 0x8000;
+   }
 /*
  *	Determine source interface and associated IP address.
  */
@@ -488,10 +516,18 @@ local_version(void) {
  */
 void
 local_help(void) {
-   fprintf(stderr, "\n--data=<d> or -D <d>\tSpecify TCP detination port(s).\n");
+   fprintf(stderr, "\n--data=<p> or -D <p>\tSpecify TCP detination port(s).\n");
    fprintf(stderr, "\t\t\tThis option can be a single port, a list of ports\n");
    fprintf(stderr, "\t\t\tseparated by commas, or an inclusive range with the\n");
    fprintf(stderr, "\t\t\tbounds separated by \"-\".\n");
+   fprintf(stderr, "\n--sport=<p> or -s <p>\tSpecify TCP source port.\n");
+   fprintf(stderr, "\t\t\tThe default is a random port in the range 32678-65535.\n");
+   fprintf(stderr, "\n--seq=<s> or -e <s>\tSpecify initial sequence number.\n");
+   fprintf(stderr, "\t\t\tThe default initial sequence number is random.\n");
+   fprintf(stderr, "\n--window=<w> or -w <w>\tSpecify the TCP window size.\n");
+   fprintf(stderr, "\t\t\tThe default window size is %u.\n", DEFAULT_WINDOW);
+   fprintf(stderr, "\n--openonly or -o\tOnly display open ports.\n");
+   fprintf(stderr, "\t\t\tWith this option, closed ports are not displayed.\n");
 }
 
 /*
@@ -551,11 +587,15 @@ local_add_host(char *name, unsigned timeout) {
       unsigned i;
 
       port1=strtoul(cp, &cp, 10);
+      if (!port1)
+         err_msg("Invalid port specification: %s", port_spec);
       if (*cp == ',' || *cp == '\0') {	/* Single port specification */
          add_host_port(name, timeout, port1);
       } else if (*cp == '-') {		/* Inclusive range */
          cp++;
          port2=strtoul(cp, &cp, 10);
+         if (!port2)	/* Generally caused by omitting end of range */
+            err_msg("Invalid port specification: %s", port_spec);
          for (i=port1; i<=port2; i++)
             add_host_port(name, timeout, i);
       } else {
@@ -779,6 +819,19 @@ local_find_host(struct host_entry **ptr, struct host_entry *he,
    return 1;
 }
 
+/*
+ * callback -- pcap callback function
+ *
+ * Inputs:
+ *
+ *	args		Special args (not used)
+ *	header		pcap header structire
+ *	packet_in	The captured packet
+ *
+ * Returns:
+ *
+ * None
+ */
 void
 callback(u_char *args, const struct pcap_pkthdr *header,
          const u_char *packet_in) {
@@ -819,8 +872,14 @@ callback(u_char *args, const struct pcap_pkthdr *header,
  */
             if (verbose > 1)
                warn_msg("---\tReceived packet #%u from %s",temp_cursor->num_recv ,inet_ntoa(source_ip));
-            display_packet(n, packet_in, temp_cursor, &source_ip);
-            responders++;
+ /*
+  *	Display the packet and increment the number of responders if we are
+  *	counting all packets (open_only == 0) or if SYN and ACK are set.
+  */
+            if (!open_only || (tcph->syn && tcph->ack)) {
+               display_packet(n, packet_in, temp_cursor, &source_ip);
+               responders++;
+            }
             if (verbose > 1)
                warn_msg("---\tRemoving host entry %u (%s) - Received %d bytes", temp_cursor->n, inet_ntoa(source_ip), n);
             remove_host(temp_cursor);
@@ -832,4 +891,106 @@ callback(u_char *args, const struct pcap_pkthdr *header,
             if (verbose)
                warn_msg("---\tIgnoring %d bytes from unknown host %s", n, inet_ntoa(source_ip));
          }
+}
+
+/*
+ *	local_process_options	--	Process options and arguments.
+ *
+ *	Inputs:
+ *
+ *	argc	Command line arg count
+ *	argv	Command line args
+ *
+ *	Returns:
+ *
+ *      0 (Zero) if this function doesn't need to do anything, or
+ *      1 (One) if this function replaces the generic process_options function.
+ *
+ *      This protocol-specific process_options routine can replace the generic
+ *      rawip-scan process_options routine if required.  If it is to replace the
+ *      generic routine, then it must perform all of the process_options
+ *	functions and return 1.  Otherwise, it must do nothing and return 0.
+ */
+int
+local_process_options(int argc, char *argv[]) {
+   struct option long_options[] = {
+      {"file", required_argument, 0, 'f'},
+      {"help", no_argument, 0, 'h'},
+      {"protocol", required_argument, 0, 'p'},
+      {"retry", required_argument, 0, 'r'},
+      {"timeout", required_argument, 0, 't'},
+      {"interval", required_argument, 0, 'i'},
+      {"backoff", required_argument, 0, 'b'},
+      {"verbose", no_argument, 0, 'v'},
+      {"version", no_argument, 0, 'V'},
+      {"debug", no_argument, 0, 'd'},
+      {"data", required_argument, 0, 'D'},
+      {"sport", required_argument, 0, 's'},
+      {"seq", required_argument, 0, 'e'},
+      {"window", required_argument, 0, 'w'},
+      {"openonly", no_argument, 0, 'o'},
+      {0, 0, 0, 0}
+   };
+   const char *short_options = "f:hp:r:t:i:b:vVdD:s:e:w:o";
+   int arg;
+   int options_index=0;
+
+   while ((arg=getopt_long_only(argc, argv, short_options, long_options, &options_index)) != -1) {
+      switch (arg) {
+         case 'f':	/* --file */
+            strncpy(filename, optarg, MAXLINE);
+            filename_flag=1;
+            break;
+         case 'h':	/* --help */
+            usage();
+            break;
+         case 'p':	/* --protocol */
+            ip_protocol=atoi(optarg);
+            break;
+         case 'r':	/* --retry */
+            retry=atoi(optarg);
+            break;
+         case 't':	/* --timeout */
+            timeout=atoi(optarg);
+            break;
+         case 'i':	/* --interval */
+            interval=atoi(optarg);
+            break;
+         case 'b':	/* --backoff */
+            backoff_factor=atof(optarg);
+            break;
+         case 'v':	/* --verbose */
+            verbose++;
+            break;
+         case 'V':	/* --version */
+            rawip_scan_version();
+            exit(0);
+            break;
+         case 'd':	/* --debug */
+            debug++;
+            break;
+         case 'D':	/* --data */
+            local_data = Malloc(strlen(optarg)+1);
+            strcpy(local_data, optarg);
+            break;
+         case 's':	/* --sport */
+            source_port=strtoul(optarg, (char **)NULL, 0);
+            source_port_flag=1;
+            break;
+         case 'e':	/* --seq */
+            seq_no=strtoul(optarg, (char **)NULL, 0);
+            seq_no_flag=1;
+            break;
+         case 'w':	/* --window */
+            window=strtoul(optarg, (char **)NULL, 0);
+            break;
+         case 'o':	/* --openonly */
+            open_only=1;
+            break;
+         default:	/* Unknown option */
+            usage();
+            break;
+      }
+   }
+   return 1;	/* Replace generic process_options() function */
 }
