@@ -218,7 +218,7 @@ main(int argc, char *argv[]) {
 /*
  *	Create raw IP socket and set IP_HDRINCL
  */
-   if ((sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0)
+   if ((sockfd = socket(AF_INET, SOCK_RAW, ip_protocol)) < 0)
       err_sys("socket");
    if ((setsockopt(sockfd, IPPROTO_IP, IP_HDRINCL, &on, sizeof(on))) != 0)
       err_sys("setsockopt");
