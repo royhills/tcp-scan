@@ -35,6 +35,7 @@ int seq_no_flag=0;
 uint16_t source_port;			/* TCP Source Port */
 int source_port_flag=0;
 uint16_t window=DEFAULT_WINDOW;		/* TCP Window size */
+uint16_t mss=DEFAULT_MSS;		/* TCP MSS. 0=Don't use MSS option */
 int open_only=0;			/* Only show open ports? */
 char const scanner_name[] = "tcp-scan";
 char const scanner_version[] = "1.4";
@@ -86,6 +87,7 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
    char *flags;
    int data_len;
    unsigned data_offset;
+   char *df;
 /*
  *	Set msg to the IP address of the host entry, plus the address of the
  *	responder if different, and a tab.
@@ -209,9 +211,14 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
    }
    if (!flags)
       flags=make_message("");	/* Ensure flags not null if no TCP flags set */
+   if (ntohs(iph->frag_off) & 0x4000) {	/* If DF flag set */
+      df = "yes";
+   } else {
+      df = "no";
+   }
    cp = msg;
-   msg = make_message("%sflags=%s win=%u ttl=%u id=%u ip_len=%d",
-                      cp, flags, ntohs(tcph->window), iph->ttl, ntohs(iph->id),
+   msg = make_message("%sDF=%s flags=%s win=%u ttl=%u id=%u ip_len=%d", cp,
+                      df, flags, ntohs(tcph->window), iph->ttl, ntohs(iph->id),
                       ntohs(iph->tot_len));
    free(cp);
    free(flags);
@@ -281,6 +288,9 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    /* Position pseudo header just before the TCP header */
    struct pseudo_hdr *pseudo = (struct pseudo_hdr *) (buf + sizeof(struct ip) -
    sizeof(struct pseudo_hdr));
+   unsigned char *options = (unsigned char *) (buf + sizeof(struct iphdr) +
+                                              sizeof(struct tcphdr));
+   size_t options_len=0;
 /*
  *	Check that the host is live.  Complain if not.
  */
@@ -296,6 +306,17 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    sa_peer.sin_addr.s_addr = he->addr.s_addr;
    sa_peer_len = sizeof(sa_peer);
 /*
+ *	Add TCP options.  We do this before the TCP header because the
+ *	options must be covered by the TCP checksum calculation.
+ */
+   if (mss) {
+      options_len += 4;
+      *options = 2;		/* Kind=2 (MSS) */
+      *(options+1) = 4;		/* Len=4 Bytes */
+      *(options+2) = mss / 256;	/* MSS high byte */
+      *(options+3) = mss % 256;	/* MSS low byte */
+   }
+/*
  *	Construct the pseudo header (for TCP checksum purposes).
  *	Note that this overlaps the IP header and gets overwritten later.
  */
@@ -303,7 +324,7 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    pseudo->s_addr = source_address;
    pseudo->d_addr = he->addr.s_addr;
    pseudo->proto  = ip_protocol;
-   pseudo->len    = htons(sizeof(struct tcphdr));
+   pseudo->len    = htons(sizeof(struct tcphdr) + options_len);
 /*
  *	Construct the TCP header.
  */
@@ -312,11 +333,11 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    tcph->source = htons(source_port);
    tcph->dest = htons(tdp->dport);
    tcph->seq = htonl(seq_no);
-   tcph->doff = 5;	/* 5 * 32bit longwords */
+   tcph->doff = (sizeof(struct tcphdr) + options_len) / 4;
    tcph->syn = 1;
    tcph->window = htons(window);
    tcph->check = in_cksum((uint16_t *)pseudo, sizeof(struct pseudo_hdr) +
-                 sizeof(struct tcphdr));
+                 sizeof(struct tcphdr) + options_len);
 /*
  *	Construct the IP Header.
  *	This overwrites the now unneeded pseudo header.
@@ -335,7 +356,7 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
  *	Copy the required data into the output buffer "buf" and set "buflen"
  *	to the number of bytes in this buffer.
  */
-   buflen=sizeof(struct iphdr) + sizeof(struct tcphdr);
+   buflen=sizeof(struct iphdr) + sizeof(struct tcphdr) + options_len;
 /*
  *	Update the last send times for this host.
  */
@@ -430,11 +451,11 @@ initialise(void) {
           pcap_datalink_val_to_name(datalink),
           pcap_datalink_val_to_description(datalink));
    switch (datalink) {
-      case DLT_EN10MB:
+      case DLT_EN10MB:		/* Ethernet */
          ip_offset = 14;
          break;
-      case DLT_PPP:
-         ip_offset = 4;
+      case DLT_LINUX_SLL:	/* PPP on Linux */
+         ip_offset = 16;
          break;
       default:
          err_msg("Unsupported datalink type");
@@ -533,6 +554,7 @@ local_help(void) {
    fprintf(stderr, "\t\t\tIf this option is specified, then the TCP ports to\n");
    fprintf(stderr, "\t\t\tscan are read from the specified file.  The file is\n");
    fprintf(stderr, "\t\t\tsame format as used by \"strobe\".\n");
+   fprintf(stderr, "\n--mss=<n> or -m <n>\tUse TCP MSS <n>.\n");
 }
 
 /*
@@ -955,9 +977,10 @@ local_process_options(int argc, char *argv[]) {
       {"window", required_argument, 0, 'w'},
       {"openonly", no_argument, 0, 'o'},
       {"servicefile", required_argument, 0, 'S'},
+      {"mss", required_argument, 0, 'm'},
       {0, 0, 0, 0}
    };
-   const char *short_options = "f:hp:r:t:i:b:vVdD:s:e:w:oS:";
+   const char *short_options = "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:";
    int arg;
    int options_index=0;
 
@@ -1015,6 +1038,9 @@ local_process_options(int argc, char *argv[]) {
             break;
          case 'S':	/* --servicefile */
             create_port_list(optarg);
+            break;
+         case 'm':	/* --mss */
+            mss=strtoul(optarg, (char **)NULL, 0);
             break;
          default:	/* Unknown option */
             usage();
