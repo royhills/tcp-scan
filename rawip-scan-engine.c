@@ -1,5 +1,5 @@
 /*
- * The RAWIP Scan Engine (rawip-scan-engine) is Copyright (C) 2003 Roy Hills,
+ * The RAWIP Scan Engine (rawip-scan-engine) is Copyright (C) 2003-2004 Roy Hills,
  * NTA Monitor Ltd.
  *
  * $Id$
@@ -785,7 +785,7 @@ make_message(const char *fmt, ...) {
 void
 rawip_scan_version (void) {
    fprintf(stderr, "%s %s (%s)\n\n", scanner_name, scanner_version, PACKAGE_STRING);
-   fprintf(stderr, "Copyright (C) 2003 Roy Hills, NTA Monitor Ltd.\n");
+   fprintf(stderr, "Copyright (C) 2003-2004 Roy Hills, NTA Monitor Ltd.\n");
    fprintf(stderr, "\n");
 /* We use rcsid here to prevent it being optimised away */
    fprintf(stderr, "%s\n", rcsid);
