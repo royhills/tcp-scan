@@ -368,8 +368,10 @@ main(int argc, char *argv[]) {
 /*
  *	The received packet is not from an IP address in the list
  *	Issue a message to that effect and ignore the packet.
+ *	We only issue a message if verbose > 1 because these events are
+ *	very common with rawip.
  */
-            if (verbose)
+            if (verbose > 1)
                warn_msg("---\tIgnoring %d bytes from unknown host %s", n, inet_ntoa(sa_peer.sin_addr));
          }
       } /* End If */
