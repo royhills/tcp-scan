@@ -105,7 +105,8 @@ main(int argc, char *argv[]) {
    info_syslog("Starting: %s", arg_str);
 #endif
 /*
- *	Call initialisation routine to perform any initial setup required.
+ *	Call protocol-specific initialisation routine to perform any
+ *	initial setup required.
  */
    initialise();
 /*
@@ -313,8 +314,8 @@ main(int argc, char *argv[]) {
  */
             if (verbose > 1)
                warn_msg("---\tReceived packet #%u from %s",temp_cursor->num_recv ,inet_ntoa(sa_peer.sin_addr));
-            display_packet(n, packet_in, temp_cursor, &(sa_peer.sin_addr),
-                           &responders);
+            display_packet(n, packet_in, temp_cursor, &(sa_peer.sin_addr));
+            responders++;
             if (verbose)
                warn_msg("---\tRemoving host entry %u (%s) - Received %d bytes", temp_cursor->n, inet_ntoa(sa_peer.sin_addr), n);
             remove_host(temp_cursor);
@@ -354,6 +355,11 @@ add_host(char *name, unsigned timeout) {
    struct hostent *hp;
    struct host_entry *he;
    struct timeval now;
+/*
+ * Return immediately if the local add_host function replaces this generic one.
+ */
+   if (local_add_host(name, timeout))
+      return;
 
    if ((hp = gethostbyname(name)) == NULL)
       err_sys("gethostbyname");
@@ -363,9 +369,8 @@ add_host(char *name, unsigned timeout) {
 
    num_hosts++;
 
-   if ((gettimeofday(&now,NULL)) != 0) {
+   if ((gettimeofday(&now,NULL)) != 0)
       err_sys("gettimeofday");
-   }
 
    he->n = num_hosts;
    memcpy(&(he->addr), hp->h_addr_list[0], sizeof(struct in_addr));
@@ -391,6 +396,10 @@ add_host(char *name, unsigned timeout) {
 /*
  * 	remove_host -- Remove the specified host from the list
  *
+ *	inputs:
+ *
+ *	he = Pointer to host entry to remove.
+ *
  *	If the host being removed is the one pointed to by the cursor, this
  *	function updates cursor so that it points to the next entry.
  */
@@ -410,6 +419,10 @@ remove_host(struct host_entry *he) {
 /*
  *	advance_cursor -- Advance the cursor to point at next live entry
  *
+ *	Inputs:
+ *
+ *	None.
+ *
  *	Does nothing if there are no live entries in the list.
  */
 void
@@ -425,10 +438,11 @@ advance_cursor(void) {
 /*
  *	find_host_by_ip	-- Find a host in the list by IP address
  *
- *	he points to current position in list.  Search runs backwards
- *	starting from this point.
+ *	Inputs:
  *
- *	addr points to the IP address to find in the list.
+ *	he = Pointer to the current position in the list.  Search runs
+ *	     backwards starting from this point.
+ *	addr = The IP address to find.
  *
  *	Returns a pointer to the host entry associated with the specified IP
  *	or NULL if no match found.
@@ -458,6 +472,14 @@ find_host_by_ip(struct host_entry *he,struct in_addr *addr) {
 
 /*
  *	recvfrom_wto -- Receive packet with timeout
+ *
+ *	Inputs:
+ *
+ *	s	= Socket file descriptor.
+ *	buf	= Buffer to receive data read from socket.
+ *	len	= Size of buffer.
+ *	saddr	= Socket structure.
+ *	tmo	= Select timeout in ms.
  *
  *	Returns number of characters received, or -1 for timeout.
  */
@@ -496,9 +518,14 @@ recvfrom_wto(int s, char *buf, int len, struct sockaddr *saddr, int tmo) {
 }
 
 /*
- *	Calculates the difference between two timevals and returns this
- *	difference in a third timeval.
- *	diff = a - b.
+ *	timeval_diff -- Calculates the difference between two timevals
+ *	and returns this difference in a third timeval.
+ *
+ *	Inputs:
+ *
+ *	a	= First timeval
+ *	b	= Second timeval
+ *	diff	= Difference between timevals (a - b).
  */
 void
 timeval_diff(struct timeval *a, struct timeval *b, struct timeval *diff) {
@@ -523,6 +550,10 @@ timeval_diff(struct timeval *a, struct timeval *b, struct timeval *diff) {
 
 /*
  *	dump_list -- Display contents of host list for debugging
+ *
+ *	Inputs:
+ *
+ *	None.
  */
 void
 dump_list(void) {
@@ -541,6 +572,10 @@ dump_list(void) {
 
 /*
  *	usage -- display usage message and exit
+ *
+ *	Inputs:
+ *
+ *	None.
  */
 void
 usage(void) {
@@ -587,6 +622,13 @@ usage(void) {
    exit(1);
 }
 
+/*
+ *	print_times -- display timing details for debugging.
+ *
+ *	Inputs:
+ *
+ *	None.
+ */
 void
 print_times(void) {
    static struct timeval time_first;	/* When print_times() was first called */
@@ -617,6 +659,17 @@ print_times(void) {
    time_last.tv_usec = time_now.tv_usec;
 }
 
+/*
+ *	udp_scan_version -- display version information
+ *
+ *	Inputs:
+ *
+ *	None.
+ *
+ *	This displays the udp-scan version information and also calls the
+ *	protocol-specific version function to display the protocol-specfic
+ *	version informattion.
+ */
 void
 udp_scan_version (void) {
    fprintf(stderr, "%s %s (%s)\n\n", scanner_name, scanner_version, PACKAGE_STRING);
