@@ -93,10 +93,15 @@
 #define REALLOC_COUNT 1000		/* Entries to realloc at once */
 
 /* Structures */
+typedef union {
+   struct in_addr v4;
+   struct in6_addr v6;
+} ip_address;
+
 struct host_entry {
    unsigned n;			/* Ordinal number for this entry */
    unsigned timeout;		/* Timeout for this host in us */
-   struct in_addr addr;		/* Host IP address */
+   ip_address addr;		/* Host IP address */
    struct timeval last_send_time; /* Time when last packet sent to this addr */
    unsigned short num_sent;	/* Number of packets sent */
    unsigned short num_recv;	/* Number of packets received */
@@ -138,6 +143,8 @@ char *printable(const unsigned char*, size_t);
 void callback(u_char *, const struct pcap_pkthdr *, const u_char *);
 void process_options(int, char *[]);
 int local_process_options(int, char *[]);
+ip_address *get_host_address(const char *, int, ip_address *, char **);
+const char *my_ntoa(ip_address);
 /* Wrappers */
 int Gettimeofday(struct timeval *);
 void *Malloc(size_t);
