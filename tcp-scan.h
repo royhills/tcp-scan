@@ -37,6 +37,8 @@
 #define DEFAULT_WINDOW 5840		/* TCP Window */
 #define DEFAULT_MSS 1460		/* TCP MSS */
 #define DEFAULT_TTL 64			/* IP TTL */
+#define DEFAULT_DF 1			/* IP DF Flag */
+#define DEFAULT_TOS 0			/* IP TOS Field */
 
 /* Structures */
 
