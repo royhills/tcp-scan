@@ -30,6 +30,7 @@ unsigned interval = DEFAULT_INTERVAL;	/* Interval between packets */
 unsigned retry = DEFAULT_RETRY;		/* Number of retries */
 unsigned timeout = DEFAULT_TIMEOUT;	/* Per-host timeout */
 float backoff_factor = DEFAULT_BACKOFF_FACTOR;	/* Backoff factor */
+int snaplen = SNAPLEN;			/* Pcap snap length */
 uint32_t seq_no;			/* Initial TCP sequence number */
 int seq_no_flag=0;
 uint16_t source_port;			/* TCP Source Port */
@@ -104,6 +105,8 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
    }
 /*
  *	Check that the packet is large enough to decode.
+ *	This should never happen because the packet length should have
+ *	already been checked in callback().
  */
    if (n < ip_offset + sizeof(struct iphdr) + sizeof(struct tcphdr)) {
       printf("%s%d byte packet too short to decode\n", msg, n);
@@ -597,7 +600,7 @@ initialise(void) {
 /*
  *	Prepare pcap
  */
-   if (!(handle = pcap_open_live(if_name, SNAPLEN, PROMISC, TO_MS, errbuf)))
+   if (!(handle = pcap_open_live(if_name, snaplen, PROMISC, TO_MS, errbuf)))
       err_msg("pcap_open_live: %s\n", errbuf);
    if ((datalink=pcap_datalink(handle)) < 0)
       err_msg("pcap_datalink: %s\n", pcap_geterr(handle));
@@ -719,6 +722,8 @@ local_help(void) {
    fprintf(stderr, "\t\t\tThis option adds 2 bytes to the packet length.\n");
    fprintf(stderr, "\n--timestamp or -T\tAdd the TIMESTAMP TCP option\n");
    fprintf(stderr, "\t\t\tThis option adds 10 bytes to the packet length.\n");
+   fprintf(stderr, "\t\t\tThis option adds 10 bytes to the packet length.\n");
+   fprintf(stderr, "\n--snap=<s> or -n <s>\tSet the pcap snap length to <s>. Default=%d.\n", SNAPLEN);
 }
 
 /*
@@ -1145,9 +1150,10 @@ local_process_options(int argc, char *argv[]) {
       {"wscale", no_argument, 0, 'W'},
       {"sack", no_argument, 0, 'a'},
       {"timestamp", no_argument, 0, 'T'},
+      {"snap", required_argument, 0, 'n'},
       {0, 0, 0, 0}
    };
-   const char *short_options = "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:WaT";
+   const char *short_options = "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:WaTn:";
    int arg;
    int options_index=0;
 
@@ -1217,6 +1223,9 @@ local_process_options(int argc, char *argv[]) {
             break;
          case 'T':	/* --timestamp */
             timestamp_flag=1;
+            break;
+         case 'n':	/* --snap */
+            snaplen=strtol(optarg, (char **)NULL, 0);
             break;
          default:	/* Unknown option */
             usage();
