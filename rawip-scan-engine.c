@@ -33,7 +33,7 @@ unsigned responders = 0;		/* Number of hosts which responded */
 unsigned live_count;			/* Number of entries awaiting reply */
 int verbose=0;				/* Verbose level */
 int debug = 0;				/* Debug flag */
-char local_data[MAXLINE];		/* Local data for scanner */
+char *local_data;			/* Local data for scanner */
 
 extern int dest_port;			/* UDP destination port */
 extern unsigned interval;		/* Interval between packets */
@@ -150,7 +150,9 @@ main(int argc, char *argv[]) {
             debug++;
             break;
          case 'D':	/* --data */
-            strncpy(local_data, optarg, MAXLINE);
+            if ((local_data = malloc(strlen(optarg)+1)) == NULL)
+               err_sys("malloc");
+            strcpy(local_data, optarg);
             break;
          default:	/* Unknown option */
             usage();
