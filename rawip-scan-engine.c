@@ -336,9 +336,14 @@ add_host(char *name, unsigned timeout) {
    if ((hp = gethostbyname(name)) == NULL)
       err_sys("gethostbyname");
 
-   he = Malloc(sizeof(struct host_entry));
-
    num_hosts++;
+
+   if (rrlist)
+      rrlist=Realloc(rrlist, num_hosts * sizeof(struct host_entry));
+   else
+      rrlist=Malloc(sizeof(struct host_entry));
+
+   he = rrlist + (num_hosts-1);	/* Would array notation be better? */
 
    Gettimeofday(&now);
 
@@ -350,17 +355,6 @@ add_host(char *name, unsigned timeout) {
    he->num_recv = 0;
    he->last_send_time.tv_sec=0;
    he->last_send_time.tv_usec=0;
-
-   if (rrlist) {	/* List is not empty so add entry */
-      he->next = rrlist;
-      he->prev = rrlist->prev;
-      he->prev->next = he;
-      he->next->prev = he;
-   } else {		/* List is empty so initialise with this entry */
-      rrlist = he;
-      he->next = he;
-      he->prev = he;
-   }
 }
 
 /*
@@ -400,7 +394,10 @@ void
 advance_cursor(void) {
    if (live_count) {
       do {
-         cursor = cursor->next;
+         if (cursor == (rrlist+(num_hosts-1)))
+            cursor = rrlist;	/* Wrap round to beginning */
+         else
+            cursor++;
       } while (!cursor->live);
    } /* End If */
    if (debug) {print_times(); printf("advance_cursor: cursor now %d\n", cursor->n);}
@@ -445,10 +442,15 @@ find_host(struct host_entry *he, struct in_addr *addr,
 
    do {
       iterations++;
-      if (p->addr.s_addr == addr->s_addr)
+      if (p->addr.s_addr == addr->s_addr) {
          found = 1;
-      else
-         p = p->prev;
+      } else {
+         if (p == rrlist) {
+            p = rrlist + (num_hosts-1);	/* Wrap round to end */
+         } else {
+            p--;
+         }
+      }
    } while (!found && p != he);
 
    if (debug) {print_times(); printf("find_host: found=%d, iterations=%u\n", found, iterations);}
@@ -534,16 +536,12 @@ timeval_diff(struct timeval *a, struct timeval *b, struct timeval *diff) {
  */
 void
 dump_list(void) {
-   struct host_entry *p;
-
-   p = rrlist;
+   int i;
 
    printf("Host List:\n\n");
    printf("Entry\tIP Address\n");
-   do {
-      printf("%u\t%s\n", p->n, inet_ntoa(p->addr));
-      p = p->next;
-   } while (p != rrlist);
+   for (i=0; i<num_hosts; i++)
+      printf("%u\t%s\n", rrlist[i].n, inet_ntoa(rrlist[i].addr));
    printf("\nTotal of %u host entries.\n\n", num_hosts);
 }
 
