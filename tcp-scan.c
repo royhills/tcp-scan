@@ -41,7 +41,7 @@ int wscale_flag=0;			/* Add wscale=0 TCP option? */
 int sack_flag=0;			/* Add SACKOK TCP option? */
 int timestamp_flag=0;			/* Add TIMESTAMP TCP option? */
 char const scanner_name[] = "tcp-scan";
-char const scanner_version[] = "1.4";
+char const scanner_version[] = "1.5";
 
 extern int verbose;	/* Verbose level */
 extern int debug;	/* Debug flag */
@@ -230,17 +230,28 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
  *	Determine TCP options.
  */
    optlen = 4*(tcph->doff) - sizeof(struct tcphdr);
-   if (n - sizeof(struct iphdr) - sizeof(struct tcphdr) < optlen)
-      optlen = n - sizeof(struct iphdr) - sizeof(struct tcphdr);
-   if (ntohs(iph->tot_len) - sizeof(struct iphdr) - sizeof(struct tcphdr) < optlen)
-      optlen = ntohs(iph->tot_len) - sizeof(struct iphdr) - sizeof(struct tcphdr);
    if (optlen) {
       char *options=NULL;
+      int trunc=0;
       unsigned char *optptr=(unsigned char *) (packet_in + ip_offset +
                                                4*(iph->ihl) +
                                                sizeof(struct tcphdr));
       uint16_t *sptr;
       unsigned char uc;
+/*
+ *	Check if options have been truncated.
+ */
+      if (n - ip_offset - sizeof(struct iphdr) - sizeof(struct tcphdr)
+          < optlen) {
+         optlen = n - ip_offset - sizeof(struct iphdr) - sizeof(struct tcphdr);
+         trunc=1;
+      }
+      if (ntohs(iph->tot_len) - sizeof(struct iphdr) - sizeof(struct tcphdr)
+          < optlen) {
+         optlen = ntohs(iph->tot_len) - sizeof(struct iphdr) -
+                  sizeof(struct tcphdr);
+         trunc=1;
+      }
 
       while (optlen > 0 && *optptr) {
          switch (*optptr) {
@@ -330,7 +341,11 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
       if (!options)
          options=make_message("");	/* Ensure options not NULL */
       cp = msg;
-      msg = make_message("%s <%s>", cp, options);
+      if (trunc) {
+         msg = make_message("%s <%s,...>", cp, options);
+      } else {
+         msg = make_message("%s <%s>", cp, options);
+      }
       free(cp);
       free(options);
    }
