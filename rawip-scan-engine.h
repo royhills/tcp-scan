@@ -92,7 +92,6 @@
 #define DEFAULT_TIMEOUT 500		/* Default per-host timeout in ms */
 #define DEFAULT_INTERVAL 15		/* Default delay between packets (ms) */
 #define DEFAULT_SOURCE_PORT 0		/* Default UDP source port */
-#define DEFAULT_DEST_PORT 1434		/* Default UDP destination port */
 #define SYSLOG 1			/* Use syslog if defined */
 #define SYSLOG_FACILITY LOG_USER	/* Syslog facility to use */
 
