@@ -593,6 +593,8 @@ usage(void) {
    fprintf(stderr, "Usage: %s [options] [hosts...]\n", scanner_name);
    fprintf(stderr, "\n");
    fprintf(stderr, "Hosts are specified on the command line unless the --file option is specified.\n");
+   fprintf(stderr, "Each host uses %u bytes of memory.\n",
+           sizeof(struct host_entry) + sizeof(struct host_entry *));
    fprintf(stderr, "\n");
    fprintf(stderr, "Options:\n");
    fprintf(stderr, "\n");
@@ -611,6 +613,13 @@ usage(void) {
    fprintf(stderr, "\t\t\tThis controls the outgoing bandwidth usage by limiting\n");
    fprintf(stderr, "\t\t\tthe rate at which packets can be sent.  The packet\n");
    fprintf(stderr, "\t\t\tinterval will be greater than or equal to this number.\n");
+   fprintf(stderr, "\t\t\tTo determine the required interval to achieve a given.\n");
+   fprintf(stderr, "\t\t\tbandwidth usage, use the following formula:\n");
+   fprintf(stderr, "\n");
+   fprintf(stderr, "\t\t\tinterval = ((packet_size * 8) / bandwidth) * 1000\n");
+   fprintf(stderr, "\n");
+   fprintf(stderr, "\t\t\tWhere interval is in ms, packet_size is in bytes, and\n");
+   fprintf(stderr, "\t\t\tbandwidth is in bits per second.\n");
    fprintf(stderr, "\n--backoff=<b> or -b <b>\tSet timeout backoff factor to <b>, default=%.2f.\n", backoff_factor);
    fprintf(stderr, "\t\t\tThe per-host timeout is multiplied by this factor\n");
    fprintf(stderr, "\t\t\tafter each timeout.  So, if the number of retrys\n");
