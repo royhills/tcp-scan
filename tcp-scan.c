@@ -37,6 +37,8 @@ unsigned data_len;
 extern int verbose;	/* Verbose level */
 extern int debug;	/* Debug flag */
 extern char *local_data;		/* Local data from --data option */
+extern struct host_entry *rrlist;	/* Round-robin linked list "the list" */
+extern unsigned num_hosts;		/* Number of entries in the list */
 
 /*
  *	display_packet -- Check and display received packet
@@ -58,10 +60,10 @@ extern char *local_data;		/* Local data from --data option */
 void
 display_packet(int n, char *packet_in, struct host_entry *he,
                struct in_addr *recv_addr) {
+   struct iphdr *iph = (struct iphdr *) packet_in;
+   struct tcphdr *tcph = (struct tcphdr *) (packet_in + sizeof(struct iphdr));
    char ip_str[MAXLINE];	/* IP address(es) to display at start */
    char *cp;
-   int i;
-
 /*
  *	Write the IP addresses to the output string.
  */
@@ -71,25 +73,22 @@ display_packet(int n, char *packet_in, struct host_entry *he,
       cp += sprintf(cp, "(%s) ", inet_ntoa(*recv_addr));
    *cp = '\0';
 /*
- *	We assume that any response is valid.
- *	Display IP address, packet length and packet data (both as hex and
- *	text).
+ *	Check that the packet is large enough to decode.
  */
-   cp = packet_in;
-   printf("%sResponse: len=%d, data=",
-             ip_str, n);
-   cp = packet_in;
-   for (i=0; i<n; i++) {
-      printf("%.2x", (unsigned char) *cp);
-      cp++;
+   if (n < sizeof(struct iphdr) + sizeof(struct tcphdr)) {
+      printf("%s%d byte packet Packet too short to decode\n", ip_str, n);
+      return;
    }
-   printf(" (");
-   cp = packet_in;
-   for (i=0; i<n; i++) {
-      printf("%c", isprint(*cp)?*cp:'.');
-      cp++;
+/*
+ *	Determine type of response: SYN-ACK, RST or something else
+ */
+   if (tcph->syn && tcph->ack) {
+      printf("%sSYN-ACK (len=%d)\n", ip_str, n);
+   } else if (tcph->rst) {
+      printf("%sRST (len=%d)\n", ip_str, n);
+   } else {
+      printf("%sUNKNOWN TCP PACKET (len=%d)\n", ip_str, n);
    }
-   printf(")\n");
 }
 
 /*
@@ -117,8 +116,8 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    char buf[MAXIP];
    int buflen;
    NET_SIZE_T sa_peer_len;
+   struct tcp_data *tdp;
    static int first_time_through=1;
-   static int tcp_port;
    static uint32_t source_address;
    struct iphdr *iph = (struct iphdr *) buf;
    struct tcphdr *tcph = (struct tcphdr *) (buf + sizeof(struct iphdr));
@@ -138,7 +137,6 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
  *	in that function.
  */
    if (first_time_through) {
-      tcp_port = atoi(local_data);
       source_address = get_source_ip("eth0");
       first_time_through=0;
    }
@@ -168,10 +166,11 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
 /*
  *	Construct the TCP header.
  */
+   tdp = (struct tcp_data *) he->local_host_data;
    memset(tcph, '\0', sizeof(struct tcphdr));
-   tcph->source = htons(5001);
-   tcph->dest = htons(tcp_port);
-   tcph->seq = htonl(0xdeadbeef);
+   tcph->source = htons(tdp->sport);
+   tcph->dest = htons(tdp->dport);
+   tcph->seq = htonl(tdp->seq);
    tcph->doff = 5;	/* 5 * 32bit longwords */
    tcph->syn = 1;
    tcph->window = htons(5840);
@@ -316,7 +315,59 @@ local_help(void) {
  */
 int
 local_add_host(char *name, unsigned timeout) {
-   return 0;
+   struct hostent *hp;
+   struct host_entry *he;
+   struct timeval now;
+   struct tcp_data *tdp;
+   static int first_time_through=1;
+   static int tcp_port;		/* TCP destination port */
+
+   if (first_time_through) {
+      if (local_data == NULL)
+         err_msg("You must specify the TCP dest port with the --data option.");
+      tcp_port = atoi(local_data);
+      first_time_through=0;
+   }
+
+   if ((hp = gethostbyname(name)) == NULL)
+      err_sys("gethostbyname");
+
+   if ((he = malloc(sizeof(struct host_entry))) == NULL)
+      err_sys("malloc");
+
+   if ((tdp = malloc(sizeof(struct tcp_data))) == NULL)
+      err_sys("malloc");
+
+   tdp->sport=5001;
+   tdp->dport=tcp_port;
+   tdp->seq=0xdeadbeef;
+
+   num_hosts++;
+
+   if ((gettimeofday(&now,NULL)) != 0)
+      err_sys("gettimeofday");
+
+   he->n = num_hosts;
+   memcpy(&(he->addr), hp->h_addr_list[0], sizeof(struct in_addr));
+   he->live = 1;
+   he->timeout = timeout * 1000;	/* Convert from ms to us */
+   he->num_sent = 0;
+   he->num_recv = 0;
+   he->last_send_time.tv_sec=0;
+   he->last_send_time.tv_usec=0;
+   he->local_host_data = tdp;
+
+   if (rrlist) {	/* List is not empty so add entry */
+      he->next = rrlist;
+      he->prev = rrlist->prev;
+      he->prev->next = he;
+      he->next->prev = he;
+   } else {		/* List is empty so initialise with this entry */
+      rrlist = he;
+      he->next = he;
+      he->prev = he;
+   }
+   return 1;	/* Replace generic add_host() function */
 }
 
 /*
@@ -427,5 +478,47 @@ uint32_t get_source_ip(char *devname) {
 int
 local_find_host(struct host_entry **ptr, struct host_entry *he,
                 struct in_addr *addr, unsigned char *packet_in, int n) {
-   return 0;
+   struct iphdr *iph = (struct iphdr *) packet_in;
+   struct tcphdr *tcph = (struct tcphdr *) (packet_in + sizeof(struct iphdr));
+   struct host_entry *p;
+   int found = 0;
+   struct tcp_data *tdp;
+   unsigned iterations = 0;     /* Used for debugging */
+/*
+ *      Don't try to match if host ptr is NULL.
+ *      This should never happen, but we check just in case.
+ */
+   if (he == NULL) {
+      *ptr = NULL;
+      return 1;
+   }
+/*
+ *      Don't try to match if packet is too short.
+ */
+   if (n < sizeof(struct iphdr) + sizeof(struct tcphdr)) {
+      *ptr = NULL;
+      return 1;
+   }
+
+
+   p = he;
+   do {
+      iterations++;
+      tdp = (struct tcp_data *) p->local_host_data;
+      if ((p->addr.s_addr == addr->s_addr) &&
+          (ntohs(tcph->dest) == tdp->sport) &&
+          (ntohl(tcph->ack_seq) == tdp->seq + 1))
+         found = 1;
+      else
+         p = p->prev;
+   } while (!found && p != he);
+
+   if (debug) {print_times(); printf("find_host: found=%d, iterations=%u\n", found, iterations);}
+
+   if (found)
+      *ptr = p;
+   else
+      *ptr = NULL;
+
+   return 1;
 }
