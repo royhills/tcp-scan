@@ -18,10 +18,14 @@
 #include <netinet/tcp.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
+#include <sys/utsname.h>
+#include "md5.h"
 
 /* Defines */
 
+/* IP protocol 6 = TCP */
 #define DEFAULT_IP_PROTOCOL 6		/* Default IP Protocol */
+/* Packet size is 40 bytes.  10ms = 32,000 bps */
 #define DEFAULT_INTERVAL 10             /* Default delay between packets (ms) */
 #define DEFAULT_BACKOFF_FACTOR 1.5      /* Default timeout backoff factor */
 #define DEFAULT_RETRY 3                 /* Default number of retries */
@@ -30,9 +34,7 @@
 /* Structures */
 
 struct tcp_data {
-   uint32_t seq;	/* Sequence number */
-   uint16_t sport;	/* Source port */
-   uint16_t dport;	/* Source port */
+   uint16_t dport;	/* Destination port */
 };
 
 /* Functions */
