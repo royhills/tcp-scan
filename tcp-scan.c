@@ -30,15 +30,18 @@ unsigned interval = DEFAULT_INTERVAL;	/* Interval between packets */
 unsigned retry = DEFAULT_RETRY;		/* Number of retries */
 unsigned timeout = DEFAULT_TIMEOUT;	/* Per-host timeout */
 float backoff_factor = DEFAULT_BACKOFF_FACTOR;	/* Backoff factor */
+uint32_t seq_no;			/* Initial TCP sequence number */
+uint16_t source_port;			/* TCP Source Port */
 char const scanner_name[] = "tcp-scan";
 char const scanner_version[] = "1.0";
-unsigned data_len;
 
 extern int verbose;	/* Verbose level */
 extern int debug;	/* Debug flag */
 extern char *local_data;		/* Local data from --data option */
 extern struct host_entry *rrlist;	/* Round-robin linked list "the list" */
 extern unsigned num_hosts;		/* Number of entries in the list */
+extern unsigned rejected;		/* Packets rejected because not ours */
+extern unsigned max_iter;		/* Max iterations in find_host() */
 
 /*
  *	display_packet -- Check and display received packet
@@ -58,7 +61,7 @@ extern unsigned num_hosts;		/* Number of entries in the list */
  *      was received in the format: <IP-Address><TAB><Details>.
  */
 void
-display_packet(int n, char *packet_in, struct host_entry *he,
+display_packet(int n, unsigned char *packet_in, struct host_entry *he,
                struct in_addr *recv_addr) {
    struct iphdr *iph = (struct iphdr *) packet_in;
    struct tcphdr *tcph = (struct tcphdr *) (packet_in + sizeof(struct iphdr));
@@ -168,9 +171,9 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
  */
    tdp = (struct tcp_data *) he->local_host_data;
    memset(tcph, '\0', sizeof(struct tcphdr));
-   tcph->source = htons(tdp->sport);
+   tcph->source = htons(source_port);
    tcph->dest = htons(tdp->dport);
-   tcph->seq = htonl(tdp->seq);
+   tcph->seq = htonl(seq_no);
    tcph->doff = 5;	/* 5 * 32bit longwords */
    tcph->syn = 1;
    tcph->window = htons(5840);
@@ -232,6 +235,40 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
  */
 void
 initialise(void) {
+   md5_state_t context;
+   struct timeval now;
+   pid_t pid;
+   struct utsname uname_buf;
+   char str[MAXLINE];
+   md5_byte_t md5_digest[16];		/* MD5 hash used as random source */
+/*
+ *	Create an MD5 hash of various things to use as a source of random
+ *	data.
+ */
+   if ((gettimeofday(&now,NULL)) != 0) {
+      perror("gettimeofday");
+      exit(1);
+   }
+   pid=getpid();
+   if ((uname(&uname_buf)) !=0 ) {
+      perror("uname");
+      exit(1);
+   }
+
+   sprintf(str, "%lu %lu %u %s", now.tv_usec, now.tv_sec, pid,
+           uname_buf.nodename);
+   md5_init(&context);
+   md5_append(&context, (const md5_byte_t *)str, strlen(str));
+   md5_finish(&context, md5_digest);
+/*
+ *	Set the sequence number and source port using the MD5 hash.
+ *	We set the top bit of source port to make sure that it's
+ *	above 32768 and therefore out of the way of reserved ports
+ *	(1-1024).
+ */
+   memcpy(&seq_no, md5_digest, sizeof(uint32_t));
+   memcpy(&source_port, md5_digest+sizeof(uint32_t), sizeof(uint16_t));
+   source_port |= 0x8000;
 }
 
 /*
@@ -338,9 +375,7 @@ local_add_host(char *name, unsigned timeout) {
    if ((tdp = malloc(sizeof(struct tcp_data))) == NULL)
       err_sys("malloc");
 
-   tdp->sport=5001;
    tdp->dport=tcp_port;
-   tdp->seq=0xdeadbeef;
 
    num_hosts++;
 
@@ -485,6 +520,21 @@ local_find_host(struct host_entry **ptr, struct host_entry *he,
    struct tcp_data *tdp;
    unsigned iterations = 0;     /* Used for debugging */
 /*
+ *      Don't try to match if packet is too short.
+ */
+   if (n < sizeof(struct iphdr) + sizeof(struct tcphdr)) {
+      *ptr = NULL;
+      return 1;
+   }
+/*
+ *	Don't try to match if it's not a response to one of our packets.
+ */
+   if ((ntohl(tcph->ack_seq)) != seq_no+1 || (ntohs(tcph->dest) != source_port)) {
+      *ptr = NULL;
+      rejected++;
+      return 1;
+   }
+/*
  *      Don't try to match if host ptr is NULL.
  *      This should never happen, but we check just in case.
  */
@@ -492,28 +542,22 @@ local_find_host(struct host_entry **ptr, struct host_entry *he,
       *ptr = NULL;
       return 1;
    }
-/*
- *      Don't try to match if packet is too short.
- */
-   if (n < sizeof(struct iphdr) + sizeof(struct tcphdr)) {
-      *ptr = NULL;
-      return 1;
-   }
-
 
    p = he;
    do {
       iterations++;
       tdp = (struct tcp_data *) p->local_host_data;
       if ((p->addr.s_addr == addr->s_addr) &&
-          (ntohs(tcph->dest) == tdp->sport) &&
-          (ntohl(tcph->ack_seq) == tdp->seq + 1))
+          (ntohs(tcph->source) == tdp->dport))
          found = 1;
       else
          p = p->prev;
    } while (!found && p != he);
 
    if (debug) {print_times(); printf("find_host: found=%d, iterations=%u\n", found, iterations);}
+
+   if (iterations > max_iter)
+      max_iter=iterations;
 
    if (found)
       *ptr = p;
