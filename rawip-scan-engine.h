@@ -100,6 +100,7 @@ struct host_entry {
    unsigned timeout;		/* Timeout for this host in ms */
    unsigned short num_sent;	/* Number of packets sent */
    unsigned short num_recv;	/* Number of packets received */
+   void *local_host_data;	/* Protocol-specific data */
 };
 
 /* Functions */
@@ -117,7 +118,7 @@ int recvfrom_wto(int, char *, int, struct sockaddr *, int);
 void remove_host(struct host_entry *);
 void timeval_diff(struct timeval *, struct timeval *, struct timeval *);
 struct host_entry *find_host_by_ip(struct host_entry *, struct in_addr *);
-void display_packet(int, char *, struct host_entry *, struct in_addr *, unsigned *);
+void display_packet(int, char *, struct host_entry *, struct in_addr *);
 void advance_cursor(void);
 void dump_list(void);
 void print_times(void);
@@ -126,3 +127,4 @@ void clean_up(void);
 void udp_scan_version(void);
 void local_version(void);
 void local_help(void);
+int local_add_host(char *, unsigned);
