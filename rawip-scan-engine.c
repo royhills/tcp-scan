@@ -41,6 +41,7 @@ int pcap_fd;				/* Pcap file descriptor */
 char filename[MAXLINE];
 int filename_flag=0;
 int random_flag=0;			/* Randomise the list */
+int numeric_flag=0;			/* IP addresses only */
 
 extern unsigned interval;		/* Desired interval between packets */
 extern char const scanner_name[];	/* Scanner Name */
@@ -142,7 +143,7 @@ main(int argc, char *argv[]) {
    if (filename_flag) {	/* Populate list from file */
       FILE *fp;
       char line[MAXLINE];
-      char host[MAXLINE];
+      char *cp;
 
       if ((strcmp(filename, "-")) == 0) {	/* Filename "-" means stdin */
          if ((fp = fdopen(0, "r")) == NULL) {
@@ -155,9 +156,11 @@ main(int argc, char *argv[]) {
       }
 
       while (fgets(line, MAXLINE, fp)) {
-         if ((sscanf(line, "%s", host)) == 1) {
-            add_host(host, timeout);
-         }
+         cp = line;
+         while (!isspace(*cp) && *cp != '\0')
+            cp++;
+         *cp = '\0';
+         add_host(line, timeout);
       }
       fclose(fp);
    } else {		/* Populate list from command line arguments */
@@ -359,31 +362,45 @@ main(int argc, char *argv[]) {
  */
 void
 add_host(char *name, unsigned timeout) {
-   struct hostent *hp;
+   struct hostent *hp=NULL;
+   struct in_addr inp;
    struct host_entry *he;
    struct timeval now;
+   static int num_left=0;	/* Number of free entries left */
 /*
  * Return immediately if the local add_host function replaces this generic one.
  */
    if (local_add_host(name, timeout))
       return;
 
-   if ((hp = gethostbyname(name)) == NULL)
-      err_sys("gethostbyname");
+   if (numeric_flag) {
+      if (!(inet_aton(name, &inp)))
+         err_sys("inet_aton failed for \"%s\"", name);
+   } else {
+      if ((hp = gethostbyname(name)) == NULL)
+         err_sys("gethostbyname failed for \"%s\"", name);
+   }
 
+   if (!num_left) {	/* No entries left, allocate some more */
+      if (helist)
+         helist=Realloc(helist, (num_hosts * sizeof(struct host_entry)) +
+                        REALLOC_COUNT*sizeof(struct host_entry));
+      else
+         helist=Malloc(REALLOC_COUNT*sizeof(struct host_entry));
+      num_left = REALLOC_COUNT;
+   }
+
+   he = helist + num_hosts;	/* Would array notation be better? */
    num_hosts++;
-
-   if (helist)
-      helist=Realloc(helist, num_hosts * sizeof(struct host_entry));
-   else
-      helist=Malloc(sizeof(struct host_entry));
-
-   he = helist + (num_hosts-1);	/* Would array notation be better? */
+   num_left--;
 
    Gettimeofday(&now);
 
    he->n = num_hosts;
-   memcpy(&(he->addr), hp->h_addr_list[0], sizeof(struct in_addr));
+   if (numeric_flag)
+      memcpy(&(he->addr), &inp, sizeof(struct in_addr));
+   else
+      memcpy(&(he->addr), hp->h_addr_list[0], sizeof(struct in_addr));
    he->live = 1;
    he->timeout = timeout * 1000;	/* Convert from ms to us */
    he->num_sent = 0;
@@ -635,6 +652,9 @@ usage(void) {
    fprintf(stderr, "\t\t\t    scanning starts.\n");
    fprintf(stderr, "\n--version or -V\t\tDisplay program version and exit.\n");
    fprintf(stderr, "\n--random or -R\t\tRandomise the host list.\n");
+   fprintf(stderr, "\n--numeric or -N\t\tIP addresses only, no hostnames.\n");
+   fprintf(stderr, "\t\t\tWith this option, all hosts must be specified as\n");
+   fprintf(stderr, "\t\t\tIP addresses.  Hostnames are not permitted.\n");
 /* Call scanner-specific help function */
    local_help();
    fprintf(stderr, "\n");
@@ -854,9 +874,10 @@ process_options(int argc, char *argv[]) {
       {"debug", no_argument, 0, 'd'},
       {"data", required_argument, 0, 'D'},
       {"random", no_argument, 0, 'R'},
+      {"numeric", no_argument, 0, 'N'},
       {0, 0, 0, 0}
    };
-   const char *short_options = "f:hp:r:t:i:b:vVdD:";
+   const char *short_options = "f:hp:r:t:i:b:vVdD:N";
    int arg;
    int options_index=0;
 /*
@@ -906,6 +927,9 @@ process_options(int argc, char *argv[]) {
             break;
          case 'R':      /* --random */
             random_flag=1;
+            break;
+         case 'N':	/* --numeric */
+            numeric_flag=1;
             break;
          default:	/* Unknown option */
             usage();
