@@ -15,6 +15,7 @@
 
 /* Includes */
 #include <netinet/ip.h>
+#include <netinet/udp.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <sys/utsname.h>
@@ -38,6 +39,7 @@
 #define DEFAULT_TOS 0			/* IP TOS Field */
 #define DEFAULT_ICMP_TYPE 8
 #define UNREACH_PROTO 99		/* IP proto for proto unreachable */
+#define UNREACH_PORT 33434		/* UDP port for port unreachable */
 
 /* Structures */
 

@@ -262,6 +262,17 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    NET_SIZE_T sa_peer_len;
    struct iphdr *iph = (struct iphdr *) buf;
    struct icmphdr *icmph = (struct icmphdr *) (buf + sizeof(struct iphdr));
+   struct udphdr *udph = (struct udphdr *) (buf + sizeof(struct iphdr));
+   struct pseudo_hdr {  /* For computing TCP checksum */
+      uint32_t s_addr;
+      uint32_t d_addr;
+      uint8_t  mbz;
+      uint8_t  proto;
+      uint16_t len;
+   };
+   /* Position pseudo header just before the UDP header */
+   struct pseudo_hdr *pseudo = (struct pseudo_hdr *) (buf + sizeof(struct ip) -
+   sizeof(struct pseudo_hdr));
 /*
  *	Check that the host is live.  Complain if not.
  */
@@ -286,7 +297,11 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
 /*
  *	Construct the ICMP header.
  */
-   memset(icmph, '\0', sizeof(struct icmphdr));
+   if (icmp_packet_type == 33)
+      memset(udph, '\0', sizeof(struct icmphdr));
+   else
+      memset(icmph, '\0', sizeof(struct icmphdr));
+
    switch (icmp_packet_type) {
       struct timeval tvorig;
       unsigned long tsorig;
@@ -326,8 +341,23 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
          icmph->un.info.id = htons(icmp_id_no);
          icmph->un.info.sequence = htons(icmp_seq_no);
          break;
+      case 33:
+         memset(pseudo, '\0', sizeof(struct pseudo_hdr));
+         pseudo->s_addr = source_address;
+         pseudo->d_addr = he->addr.v4.s_addr;
+         pseudo->proto  = ip_protocol;
+         pseudo->len    = htons(sizeof(struct udphdr));
+         udph->source = htons(icmp_id_no);
+         udph->dest = htons(UNREACH_PORT);
+         udph->len = htons(sizeof(struct udphdr));
+         break;
    }
-   icmph->checksum = in_cksum((uint16_t *)icmph, sizeof(struct icmphdr));
+
+   if (icmp_packet_type == 33)
+      udph->check = in_cksum((uint16_t *)pseudo, sizeof(struct pseudo_hdr) +
+                             sizeof(struct udphdr));
+   else
+      icmph->checksum = in_cksum((uint16_t *)icmph, sizeof(struct icmphdr));
 /*
  *	Construct the IP Header.
  */
@@ -335,7 +365,10 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    iph->ihl = 5;	/* 5 * 32-bit longwords = 20 bytes */
    iph->version = 4;
    iph->tos = ip_tos;
-   iph->tot_len = sizeof(struct iphdr) + sizeof(struct icmphdr);
+   if (icmp_packet_type == 33)
+      iph->tot_len = sizeof(struct iphdr) + sizeof(struct udphdr);
+   else
+      iph->tot_len = sizeof(struct iphdr) + sizeof(struct icmphdr);
    iph->id = 0;		/* Linux kernel fills this in */
    if (df_flag)
       iph->frag_off = htons(0x4000);
@@ -350,7 +383,10 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
  *	Copy the required data into the output buffer "buf" and set "buflen"
  *	to the number of bytes in this buffer.
  */
-   buflen=sizeof(struct iphdr) + sizeof(struct icmphdr);
+   if (icmp_packet_type == 33)
+      buflen=sizeof(struct iphdr) + sizeof(struct udphdr);
+   else
+      buflen=sizeof(struct iphdr) + sizeof(struct icmphdr);
 /*
  *	Send the packet.
  */
@@ -499,6 +535,16 @@ initialise(void) {
          free(filter_string);
          ip_protocol = UNREACH_PROTO;	/* value to cause proto unreach */
          break;
+      case 33:
+         filter_string=make_message("icmp[0:1]=3 and icmp[1:1]=3 and dst host %s and icmp[28:2]=%u and icmp[30:2]=%u",
+                                    my_ntoa(local_address), icmp_id_no,
+                                    UNREACH_PORT);
+         if ((pcap_compile(handle,&filter,filter_string,OPTIMISE,netmask)) < 0)
+            err_msg("pcap_geterr: %s\n", pcap_geterr(handle));
+         warn_msg("pcap filter string: %s", filter_string);
+         free(filter_string);
+         ip_protocol = 17;	/* UDP */
+         break;
       default:
          err_msg("Unsupported ICMP packet type: %u", icmp_packet_type);
          break;
@@ -605,6 +651,7 @@ local_help(void) {
    fprintf(stderr, "\t\t\t15 - Information Request\n");
    fprintf(stderr, "\t\t\t17 - Address Mask Request\n");
    fprintf(stderr, "\t\t\t32 - Protocol Unreachable (type 3, code 2)\n");
+   fprintf(stderr, "\t\t\t33 - Port Unreachable (type 3, code 3)\n");
 }
 
 /*
