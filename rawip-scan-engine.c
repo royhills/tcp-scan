@@ -90,6 +90,7 @@ main(int argc, char *argv[]) {
    double elapsed_seconds;	/* Elapsed time in seconds */
    static int reset_cum_err;
    static int pass_no;
+   int first_timeout=1;
 /*
  *	Open syslog channel and log arguments if required.
  *	We must be careful here to avoid overflowing the arg_str buffer
@@ -314,6 +315,18 @@ main(int argc, char *argv[]) {
                   warn_msg("---\tRemoving host entry %u (%s) - Timeout", cursor->n, inet_ntoa(cursor->addr));
                if (debug) {print_times(); printf("main: Timing out host %d.\n", cursor->n);}
                remove_host(cursor);	/* Automatically calls advance_cursor() */
+               if (first_timeout) {
+                  timeval_diff(&now, &(cursor->last_send_time), &diff);
+                  host_timediff = 1000000*diff.tv_sec + diff.tv_usec;
+                  while (host_timediff >= cursor->timeout) {
+                     if (verbose > 1)
+                        warn_msg("---\tRemoving host %u (%s) - Catch-Up Timeout", cursor->n, inet_ntoa(cursor->addr));
+                     remove_host(cursor);
+                     timeval_diff(&now, &(cursor->last_send_time), &diff);
+                     host_timediff = 1000000*diff.tv_sec + diff.tv_usec;
+                  }
+                  first_timeout=0;
+               }
                if ((gettimeofday(&last_packet_time, NULL)) != 0)
                   err_sys("gettimeofday");
             } else {	/* Retry limit not reached for this host */
