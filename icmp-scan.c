@@ -39,6 +39,7 @@ int df_flag=DEFAULT_DF;			/* IP DF Flag */
 int ip_tos=DEFAULT_TOS;			/* IP TOS Field */
 uint16_t icmp_id_no;			/* ICMP Identifier */
 uint16_t icmp_seq_no;			/* ICMP Sequence Number */
+int icmp_packet_type = DEFAULT_ICMP_TYPE;
 char const scanner_name[] = "icmp-scan";
 char const scanner_version[] = "1.0";
 
@@ -91,6 +92,24 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
    char *msg;
    char *cp;
    char *df;
+   static const id_name_map icmp_type_map[] = {
+      {0, "Echo_Reply"},
+      {3, "Destination_Unreachable"},
+      {4, "Source_Quench"},
+      {5, "Redirect"},
+      {8, "Echo_Request"},
+      {9, "Router_Advertisement"},
+      {10, "Router_Solicitation"},
+      {11, "Time_Exceeded"},
+      {12, "Parameter_Problem"},
+      {13, "Timestamp_Request"},
+      {14, "Timestamp_Reply"},
+      {15, "Information_Request"},
+      {16, "Information_Reply"},
+      {17, "Address_Mask_Request"},
+      {18, "Address_Mask_Reply"},
+      {-1, NULL}
+   };
 /*
  *	Set msg to the IP address of the host entry, plus the address of the
  *	responder if different, and a tab.
@@ -120,15 +139,10 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
    iph = (struct iphdr *) (packet_in + ip_offset);
    icmph = (struct icmphdr *) (packet_in + ip_offset + 4*(iph->ihl));
 /*
- *	Determine type of response: SYN-ACK, RST or something else and
- *	add to message.
+ *	Determine type of response and add to message.
  */
    cp = msg;
-   if (icmph->type == 0 && icmph->code == 0) {	/* 0/0 = Echo Reply */
-      msg = make_message("%sEchoReply", cp);
-   } else {					/* Shouldn't happen */
-      msg = make_message("%sUNKNOWN", cp);
-   }
+   msg = make_message("%s%s", cp, id_to_name(icmph->type, icmp_type_map));
    free(cp);
    if (!quiet_flag) {
 /*
@@ -144,6 +158,18 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
                        cp, df, iph->tos, iph->ttl,
                        ntohs(iph->id), ntohs(iph->tot_len));
       free(cp);
+/*
+ *	Add the ICMP details to the message.
+ */
+      switch(icmph->type) {
+         case 0:
+            cp = msg;
+            msg = make_message("%s icmp_id=%u, icmp_seq=%u",
+                               cp, ntohs(icmph->un.echo.id),
+                               ntohs(icmph->un.echo.sequence));
+            free(cp);
+            break;
+      }
 /*
  *	If the host entry is not live, then flag this as a duplicate.
  */
@@ -214,8 +240,8 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    memset(icmph, '\0', sizeof(struct icmphdr));
    icmph->type = 8;
    icmph->code = 0;
-   icmph->un.echo.id = htons(he->dport);
-   icmph->un.echo.sequence = htons(1);
+   icmph->un.echo.id = htons(icmp_id_no);
+   icmph->un.echo.sequence = htons(icmp_seq_no);
    icmph->checksum = in_cksum((uint16_t *)icmph, sizeof(struct icmphdr));
 /*
  *	Construct the IP Header.
@@ -280,6 +306,7 @@ initialise(void) {
    bpf_u_int32 netmask;
    bpf_u_int32 localnet;
    int datalink;
+   ip_address local_address;		/* Used for filter string */
 /*
  *	Create an MD5 hash of various things to use as a source of random
  *	data.
@@ -312,6 +339,7 @@ initialise(void) {
          if_name="eth0";
    }
    source_address = get_source_ip(if_name);
+   local_address.v4.s_addr = source_address;
 /*
  *	Prepare pcap
  */
@@ -339,10 +367,17 @@ initialise(void) {
       err_msg("pcap_setnonblock: %s\n", errbuf);
    if (pcap_lookupnet(if_name, &localnet, &netmask, errbuf) < 0)
       err_msg("pcap_lookupnet: %s\n", errbuf);
-   filter_string=make_message("icmp");
-   if ((pcap_compile(handle, &filter, filter_string, OPTIMISE, netmask)) < 0)
-      err_msg("pcap_geterr: %s\n", pcap_geterr(handle));
-   free(filter_string);
+   switch (icmp_packet_type) {
+      case 8:
+         filter_string=make_message("icmp[0:1]=0 and dst host %s and icmp[4:2]=%u and icmp[6:2]=%u",
+                                    my_ntoa(local_address), icmp_id_no,
+                                    icmp_seq_no);
+         if ((pcap_compile(handle,&filter,filter_string,OPTIMISE,netmask)) < 0)
+            err_msg("pcap_geterr: %s\n", pcap_geterr(handle));
+         warn_msg("pcap filter string: %s", filter_string);
+         free(filter_string);
+         break;
+   }
    if ((pcap_setfilter(handle, &filter)) < 0)
       err_msg("pcap_setfilter: %s\n", pcap_geterr(handle));
 }
@@ -409,10 +444,6 @@ local_version(void) {
  */
 void
 local_help(void) {
-   fprintf(stderr, "\n--data=<p> or -D <p>\tSpecify TCP detination port(s).\n");
-   fprintf(stderr, "\t\t\tThis option can be a single port, a list of ports\n");
-   fprintf(stderr, "\t\t\tseparated by commas, or an inclusive range with the\n");
-   fprintf(stderr, "\t\t\tbounds separated by \"-\".\n");
    fprintf(stderr, "\n--snap=<s> or -n <s>\tSet the pcap snap length to <s>. Default=%d.\n", SNAPLEN);
    fprintf(stderr, "\t\t\tThis specifies the frame capture length.  This\n");
    fprintf(stderr, "\t\t\tlength includes the data-link header as well as the\n");
@@ -469,45 +500,12 @@ local_help(void) {
  */
 int
 local_add_host(char *name, unsigned timeout) {
-   static int first_time_through=1;
-   char *cp;
-
-   if (first_time_through) {
-      if (local_data == NULL) {
-         err_msg("You must specify the data with the --data option");
-      }
-      first_time_through=0;
-   }
-   if (local_data) {	/* --data option specified */
-/*
- *	Determine the ports in the port spec, and add a host entry for
- *	each one.
- */
-      cp = local_data;
-      while (*cp != '\0') {
-         unsigned port1;
-   
-         port1=strtoul(cp, &cp, 10);
-         add_host_port(name, timeout, port1);
-         if (*cp == ',')
-            cp++;  /* Move on to next entry */
-      }
-   }
-
-   return 1;	/* Replace generic add_host() function */
-}
-
-void
-add_host_port(char *name, unsigned timeout, unsigned port) {
    ip_address *hp=NULL;
    ip_address addr;
    struct host_entry *he;
    struct timeval now;
    static int num_left=0;	/* Number of free entries left */
    int result;
-
-   if (port < 0 || port > 65535)
-      err_msg("Invalid port number: %u.  Port must be in range 1-65535", port);
 
    if (numeric_flag) {
       if (ipv6_flag) {
@@ -554,7 +552,9 @@ add_host_port(char *name, unsigned timeout, unsigned port) {
    he->num_recv = 0;
    he->last_send_time.tv_sec=0;
    he->last_send_time.tv_usec=0;
-   he->dport=port;
+   he->dport=0;				/* Not currently used */
+
+   return 1;	/* Replace generic add_host() function */
 }
 
 /*
@@ -699,8 +699,7 @@ local_find_host(struct host_entry **ptr, struct host_entry **he,
    p = he;
    do {
       iterations++;
-      if (((*p)->addr.v4.s_addr == addr->s_addr) &&
-          (ntohs(icmph->un.echo.id) == (*p)->dport)) {
+      if (((*p)->addr.v4.s_addr == addr->s_addr)) {
          found = 1;
       } else {
          if (p == helistptr) {
@@ -949,4 +948,64 @@ local_process_options(int argc, char *argv[]) {
       }
    }
    return 1;	/* Replace generic process_options() function */
+}
+
+/*
+ *      id_to_name -- Return name associated with given id, or id number
+ *
+ *      Inputs:
+ *
+ *      id              The id to find in the map
+ *      id_name_map     Pointer to the id-to-name map
+ *
+ *      Returns:
+ *
+ *      A pointer to the name associated with the id if an association is
+ *      found in the map, otherwise the numeric id.  Returns NULL on error.
+ *
+ *      This function uses a sequential search through the map to find the
+ *      ID and associated name.  This is OK when the map is relatively small,
+ *      but could be time consuming if the map contains a large number of
+ *      entries.
+ */
+char *id_to_name(int id, const id_name_map map[]) {
+   int found = 0;
+   int i = 0;
+
+   if (map == NULL)
+      return NULL;
+
+   while (map[i].id != -1) {
+      if (id == map[i].id) {
+         found = 1;
+         break;
+      }
+      i++;
+   }
+
+   if (found)
+      return map[i].name;
+   else
+      return numstr(id);
+}
+
+/*
+ *      numstr -- Convert an unsigned integer to a string
+ *
+ *      Inputs:
+ *
+ *      num     The number to convert
+ *
+ *      Returns:
+ *
+ *      Pointer to the string representation of the number.
+ *
+ *      I'm surprised that there is not a standard library function to do this.
+ */
+char *
+numstr(unsigned num) {
+   static char buf[21]; /* Large enough for biggest 64-bit integer */
+
+   snprintf(buf, sizeof(buf), "%d", num);
+   return buf;
 }

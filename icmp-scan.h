@@ -25,7 +25,6 @@
 
 /* IP protocol 1 = ICMP */
 #define DEFAULT_IP_PROTOCOL 1		/* Default IP Protocol */
-/* Packet size is 40 bytes.  10ms = 32,000 bps */
 #define DEFAULT_INTERVAL 10             /* Default delay between packets (ms) */
 #define DEFAULT_BACKOFF_FACTOR 1.5      /* Default timeout backoff factor */
 #define DEFAULT_RETRY 3                 /* Default number of retries */
@@ -37,8 +36,14 @@
 #define DEFAULT_TTL 64			/* IP TTL */
 #define DEFAULT_DF 1			/* IP DF Flag */
 #define DEFAULT_TOS 0			/* IP TOS Field */
+#define DEFAULT_ICMP_TYPE 8
 
 /* Structures */
+
+typedef struct {
+   int id;                      /* ICMP IDs are 8 bits */
+   char *name;
+} id_name_map;
 
 /* Functions */
 
@@ -46,3 +51,5 @@ unsigned int hstr_i(char *);
 uint16_t in_cksum(uint16_t *, int);
 uint32_t get_source_ip(char *);
 void add_host_port(char *, unsigned, unsigned);
+char *id_to_name(int, const id_name_map[]);
+char *numstr(unsigned);
