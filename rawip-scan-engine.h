@@ -96,13 +96,13 @@ struct host_entry {
    struct host_entry *prev;	/* Previous pointer */
    struct host_entry *next;	/* Next pointer */
    unsigned n;			/* Ordinal number for this entry */
-   struct in_addr addr;		/* Host IP address */
-   u_char live;			/* Set when awaiting response */
-   struct timeval last_send_time; /* Time when last packet sent to this addr */
    unsigned timeout;		/* Timeout for this host in us */
+   struct in_addr addr;		/* Host IP address */
+   struct timeval last_send_time; /* Time when last packet sent to this addr */
    unsigned short num_sent;	/* Number of packets sent */
    unsigned short num_recv;	/* Number of packets received */
-   void *local_host_data;	/* Protocol-specific data */
+   uint16_t dport;		/* Destination port */
+   unsigned char live;		/* Set when awaiting response */
 };
 
 /* Functions */
