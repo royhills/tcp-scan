@@ -484,8 +484,7 @@ local_add_host(char *name, unsigned timeout) {
          for (i=port1; i<=port2; i++)
             add_host_port(name, timeout, i);
       } else {
-         printf("unknown port spec\n");
-         return 1;
+         err_msg("Invalid port specification: %s", port_spec);
       }
       if (*cp == ',')
          cp++;  /* Move on to next entry */
@@ -500,6 +499,9 @@ add_host_port(char *name, unsigned timeout, unsigned port) {
    struct host_entry *he;
    struct timeval now;
    struct tcp_data *tdp;
+
+   if (port < 1 || port > 65535)
+      err_msg("Invalid port number: %u.  Port must be in range 1-65535", port);
 
    if ((hp = gethostbyname(name)) == NULL)
       err_sys("gethostbyname");
