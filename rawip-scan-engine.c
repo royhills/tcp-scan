@@ -301,7 +301,7 @@ main(int argc, char *argv[]) {
       } /* End If */
 
       n=recvfrom_wto(sockfd, packet_in, MAXUDP, (struct sockaddr *)&sa_peer, select_timeout);
-      if (n > 0) {
+      if (n != -1) {
 /*
  *	We've received a response.  Try to match up the packet by IP address
  *
