@@ -1,10 +1,10 @@
 /*
- * The UDP Scan Engine (udp-scan-engine) is Copyright (C) 2003 Roy Hills,
+ * The RAWIP Scan Engine (rawip-scan-engine) is Copyright (C) 2003 Roy Hills,
  * NTA Monitor Ltd.
  *
  * $Id$
  *
- * udp-scan-engine -- The UDP Scan Engine
+ * rawip-scan-engine -- The RAWIP Scan Engine
  *
  * Author:	Roy Hills
  * Date:	11 September 2002
@@ -14,14 +14,14 @@
  *
  * Description:
  *
- * udp-scan-engine sends probe packets to a defined UDP port on the specified
- * hosts and displays any responses received.  It is a protocol-neutral engine
- * which needs some protocol specific functions (in a seperate source file) to
- * build a working scanner.
+ * rawip-scan-engine sends probe packets to the specified hosts and displays
+ * any responses received.  It is a protocol-neutral engine which needs some
+ * protocol specific functions (in a seperate source file) to build a working
+ * scanner.
  * 
  */
 
-#include "udp-scan-engine.h"
+#include "rawip-scan-engine.h"
 
 static char const rcsid[] = "$Id$";	/* RCS ID for ident(1) */
 
@@ -33,24 +33,22 @@ unsigned responders = 0;		/* Number of hosts which responded */
 unsigned live_count;			/* Number of entries awaiting reply */
 int verbose=0;				/* Verbose level */
 int debug = 0;				/* Debug flag */
-char *local_data;			/* Local data for scanner */
+char *local_data=NULL;			/* Local data for scanner */
 
-extern int dest_port;			/* UDP destination port */
 extern unsigned interval;		/* Desired interval between packets */
 extern char const scanner_name[];	/* Scanner Name */
 extern char const scanner_version[];	/* Scanner Version */
 extern unsigned retry;			/* Number of retries */
 extern unsigned timeout;		/* Per-host timeout */
 extern float backoff_factor;		/* Backoff factor */
-extern int source_port;			/* UDP source port */
+extern int ip_protocol;			/* IP protocol */
 
 int
 main(int argc, char *argv[]) {
    struct option long_options[] = {
       {"file", required_argument, 0, 'f'},
       {"help", no_argument, 0, 'h'},
-      {"sport", required_argument, 0, 's'},
-      {"dport", required_argument, 0, 'p'},
+      {"protocol", required_argument, 0, 'p'},
       {"retry", required_argument, 0, 'r'},
       {"timeout", required_argument, 0, 't'},
       {"interval", required_argument, 0, 'i'},
@@ -61,16 +59,16 @@ main(int argc, char *argv[]) {
       {"data", required_argument, 0, 'D'},
       {0, 0, 0, 0}
    };
-   const char *short_options = "f:hs:p:r:t:i:b:vVdD:";
+   const char *short_options = "f:hp:r:t:i:b:vVdD:";
    int arg;
    char arg_str[MAXLINE];	/* Args as string for syslog */
    int options_index=0;
    char filename[MAXLINE];
    int filename_flag=0;
-   int sockfd;			/* UDP socket file descriptor */
+   int sockfd;			/* IP socket file descriptor */
    struct sockaddr_in sa_peer;
    struct timeval now;
-   char packet_in[MAXUDP];	/* Received packet */
+   char packet_in[MAXIP];	/* Received packet */
    int n;
    char namebuf[MAXLINE];
    struct host_entry *temp_cursor;
@@ -135,11 +133,8 @@ main(int argc, char *argv[]) {
          case 'h':	/* --help */
             usage();
             break;
-         case 's':	/* --sport */
-            source_port=atoi(optarg);
-            break;
-         case 'p':	/* --dport */
-            dest_port=atoi(optarg);
+         case 'p':	/* --protocol */
+            ip_protocol=atoi(optarg);
             break;
          case 'r':	/* --retry */
             retry=atoi(optarg);
@@ -157,7 +152,7 @@ main(int argc, char *argv[]) {
             verbose++;
             break;
          case 'V':	/* --version */
-            udp_scan_version();
+            rawip_scan_version();
             exit(0);
             break;
          case 'd':	/* --debug */
@@ -330,7 +325,7 @@ main(int argc, char *argv[]) {
             } else {	/* Retry limit not reached for this host */
                if (cursor->num_sent)
                   cursor->timeout *= backoff_factor;
-               send_packet(sockfd, cursor, dest_port, &last_packet_time);
+               send_packet(sockfd, cursor, ip_protocol, &last_packet_time);
                advance_cursor();
             }
          } else {	/* We can't send a packet to this host yet */
@@ -347,7 +342,7 @@ main(int argc, char *argv[]) {
          if (debug) {print_times(); printf("main: Can't send packet yet.  loop_timediff=%llu\n", loop_timediff);}
       } /* End If */
 
-      n=recvfrom_wto(sockfd, packet_in, MAXUDP, (struct sockaddr *)&sa_peer, select_timeout);
+      n=recvfrom_wto(sockfd, packet_in, MAXIP, (struct sockaddr *)&sa_peer, select_timeout);
       if (n != -1) {
 /*
  *	We've received a response.  Try to match up the packet by IP address
@@ -651,8 +646,7 @@ usage(void) {
    fprintf(stderr, "\n--file=<fn> or -f <fn>\tRead hostnames or addresses from the specified file\n");
    fprintf(stderr, "\t\t\tinstead of from the command line. One name or IP\n");
    fprintf(stderr, "\t\t\taddress per line.  Use \"-\" for standard input.\n");
-   fprintf(stderr, "\n--sport=<p> or -s <p>\tSet UDP source port to <p>, default=%d, 0=random.\n", source_port);
-   fprintf(stderr, "\n--dport=<p> or -p <p>\tSet UDP destination port to <p>, default=%d.\n", dest_port);
+   fprintf(stderr, "\n--protocol=<p> or -p <p>\tSet IP protocol to <p>\n");
    fprintf(stderr, "\n--retry=<n> or -r <n>\tSet total number of attempts per host to <n>,\n");
    fprintf(stderr, "\t\t\tdefault=%d.\n", retry);
    fprintf(stderr, "\n--timeout=<n> or -t <n>\tSet initial per host timeout to <n> ms, default=%d.\n", timeout);
@@ -722,18 +716,18 @@ print_times(void) {
 }
 
 /*
- *	udp_scan_version -- display version information
+ *	rawip_scan_version -- display version information
  *
  *	Inputs:
  *
  *	None.
  *
- *	This displays the udp-scan version information and also calls the
+ *	This displays the rawip-scan version information and also calls the
  *	protocol-specific version function to display the protocol-specfic
  *	version informattion.
  */
 void
-udp_scan_version (void) {
+rawip_scan_version (void) {
    fprintf(stderr, "%s %s (%s)\n\n", scanner_name, scanner_version, PACKAGE_STRING);
    fprintf(stderr, "Copyright (C) 2003 Roy Hills, NTA Monitor Ltd.\n");
    fprintf(stderr, "\n");

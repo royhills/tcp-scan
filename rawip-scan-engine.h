@@ -1,15 +1,15 @@
 /*
- * The UDP Scan Engine (udp-scan-engine) is Copyright (C) 2003 Roy Hills,
+ * The RAWIP Scan Engine (rawip-scan-engine) is Copyright (C) 2003 Roy Hills,
  * NTA Monitor Ltd.
  *
  * $Id$
  *
- * udp-scan-engine.h -- Header file for UDP Scan Engine
+ * rawip-scan-engine.h -- Header file for RAWIP Scan Engine
  *
  * Author:	Roy Hills
  * Date:	20 February 2003
  *
- * This header file contains definitions required by both the generic UDP scan
+ * This header file contains definitions required by both the generic RAWIP scan
  * engine and also the protocol-specific code.
  */
 
@@ -124,7 +124,7 @@ void dump_list(void);
 void print_times(void);
 void initialise(void);
 void clean_up(void);
-void udp_scan_version(void);
+void rawip_scan_version(void);
 void local_version(void);
 void local_help(void);
 int local_add_host(char *, unsigned);

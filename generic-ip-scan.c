@@ -1,21 +1,21 @@
 /*
- * The Generic UDP Scanner (generic-udp-scan) is Copyright (C) 2003 Roy Hills,
+ * The Generic IP Scanner (generic-ip-scan) is Copyright (C) 2003 Roy Hills,
  * NTA Monitor Ltd.
  *
  * $Id$
  *
- * generic-udp-scan -- The Generic UDP Scanner
+ * generic-ip-scan -- The Generic IP Scanner
  *
  * Author:	Roy Hills
  * Date:	16 September 2003
  *
  * Usage:
- *    generic-udp-scan [options] [host...]
+ *    generic-ip-scan [options] [host...]
  *
  * Description:
  *
- * generic-udp-scan sends the specified UDP packet to the specified UDP port
- * on the specified hosts and displays any responses received.
+ * generic-ip-scan sends the specified IP packet to the specified hosts
+ * and displays any responses received.
  * 
  */
 
@@ -25,6 +25,7 @@
 static char const rcsid[] = "$Id$";   /* RCS ID for ident(1) */
 
 /* Global variables */
+int ip_protocol = DEFAULT_IP_PROTOCOL;	/* IP Protocol */
 unsigned interval = DEFAULT_INTERVAL;	/* Interval between packets */
 unsigned retry = DEFAULT_RETRY;		/* Number of retries */
 unsigned timeout = DEFAULT_TIMEOUT;	/* Per-host timeout */
@@ -97,8 +98,9 @@ display_packet(int n, char *packet_in, struct host_entry *he,
  *
  *	Inputs:
  *
- *	s		UDP socket file descriptor
+ *	s		IP socket file descriptor
  *	he		Host entry to send to
+ *	ip_protocol	IP Protcol to use
  *	last_packet_time	Time when last packet was sent
  *
  *      Returns:
@@ -110,15 +112,16 @@ display_packet(int n, char *packet_in, struct host_entry *he,
  *      It must also update the "last_send_time" field for this host entry.
  */
 void
-send_packet(int s, struct host_entry *he,
+send_packet(int s, struct host_entry *he, int ip_protocol,
             struct timeval *last_packet_time) {
    struct sockaddr_in sa_peer;
-   char buf[MAXUDP];
+   char buf[MAXIP];
    int buflen;
    NET_SIZE_T sa_peer_len;
    int i;
    unsigned char *cp;
    static int first_time_through=1;
+   struct iphdr iph;
 /*
  *	Initialise static packet data.
  *	We can't do this in initialise() because local_data is not available
@@ -151,11 +154,28 @@ send_packet(int s, struct host_entry *he,
    sa_peer.sin_addr.s_addr = he->addr.s_addr;
    sa_peer_len = sizeof(sa_peer);
 /*
+ *	Construct the IP Header
+ */
+   iph.ihl = 5;		/* 5 * 32-bit longwords = 20 bytes */
+   iph.version = 4;
+   iph.tos = 0;
+   iph.tot_len = sizeof(iph) + data_len;
+   iph.id = 0;
+   iph.frag_off = 0;
+   iph.ttl = 64;
+   iph.protocol = ip_protocol;
+   iph.check = 0;
+   iph.saddr = 0;
+   iph.daddr = he->addr.s_addr;
+/*
  *	Copy the required data into the output buffer "buf" and set "buflen"
  *	to the number of bytes in this buffer.
  */
-   buflen=data_len;
-   memcpy(buf, rawip_data, buflen);
+   cp = buf;
+   buflen=sizeof(iph) + data_len;
+   memcpy(cp, &iph, sizeof(iph));
+   cp += sizeof(iph);
+   memcpy(cp, rawip_data, buflen);
 /*
  *	Update the last send times for this host.
  */
@@ -250,7 +270,7 @@ local_version(void) {
 void
 local_help(void) {
    fprintf(stderr, "\n--data=<d> or -D <d>\tSpecify packet contents in hex.\n");
-   fprintf(stderr, "\t\t\tE.g. --data=deadbeef would specify the 4-byte UDP\n");
+   fprintf(stderr, "\t\t\tE.g. --data=deadbeef would specify the 4-byte IP\n");
    fprintf(stderr, "\t\t\tpayload: 0xde, 0xad, 0xbe, 0xef.\n");
 }
 
@@ -270,7 +290,7 @@ local_help(void) {
  *      This routine is called once for each specified host.
  *
  *      This protocol-specific add host routine can replace the generic
- *      udp-scan add-host routine if required.  If it is to replace the
+ *      rawip-scan add-host routine if required.  If it is to replace the
  *      generic routine, then it must perform all of the add_host functions
  *      and return 1.  Otherwise, it must do nothing and return 0.
  */
