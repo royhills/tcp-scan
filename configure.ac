@@ -1,7 +1,7 @@
 dnl $Id$
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT(udp-scan-engine, 1.5, [udp-scan-engine@nta-monitor.com])
+AC_INIT(udp-scan-engine, 1.6, [udp-scan-engine@nta-monitor.com])
 AC_CONFIG_SRCDIR([udp-scan-engine.c])
 dnl If I don't pass $PACKAGE_NAME and $PACKAGE_VERSION to AM_INIT_AUTOMAKE,
 dnl then PACKAGE and VERSION are not defined and these are required for
