@@ -39,8 +39,6 @@ unsigned char *udp_data;
 extern int verbose;	/* Verbose level */
 extern int debug;	/* Debug flag */
 extern char *local_data;		/* Local data from --data option */
-extern struct host_entry *rrlist;	/* Round-robin linked list "the list" */
-extern unsigned num_hosts;		/* Number of entries in the list */
 
 /*
  *	display_packet -- Check and display received packet
