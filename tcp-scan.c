@@ -413,9 +413,10 @@ local_version(void) {
  */
 void
 local_help(void) {
-   fprintf(stderr, "\n--data=<d> or -D <d>\tSpecify packet contents in hex.\n");
-   fprintf(stderr, "\t\t\tE.g. --data=deadbeef would specify the 4-byte IP\n");
-   fprintf(stderr, "\t\t\tpayload: 0xde, 0xad, 0xbe, 0xef.\n");
+   fprintf(stderr, "\n--data=<d> or -D <d>\tSpecify TCP detination port(s).\n");
+   fprintf(stderr, "\t\t\tThis option can be a single port, a list of ports\n");
+   fprintf(stderr, "\t\t\tseparated by commas, or an inclusive range with the\n");
+   fprintf(stderr, "\t\t\tbounds separated by \"-\".\n");
 }
 
 /*
