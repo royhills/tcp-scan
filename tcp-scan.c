@@ -439,6 +439,9 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
 /*
  *	Add TCP options.  We do this before the TCP header because the
  *	options must be covered by the TCP checksum calculation.
+ *
+ *	We put the options in the same order, and with the same padding,
+ *	as Linux 2.4.24.
  */
    optptr = options;
    if (mss) {
@@ -448,19 +451,14 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
       *optptr++ = mss % 256;	/* MSS low byte */
       options_len += 4;
    }
-   if (wscale_flag) {
-      *optptr++ = 1;		/* Kind=1 (NOP) - pad */
-      *optptr++ = 3;		/* Kind=3 (WSCALE) */
-      *optptr++ = 3;		/* Len=3 bytes */
-      *optptr++ = 0;		/* Value=0 */
-      options_len += 4;
-   }
-   if (sack_flag) {
-      *optptr++ = 4;		/* Kind=4 (SACKOK) */
-      *optptr++ = 2;		/* Len=2 bytes */
-      options_len += 2;
-   }
    if (timestamp_flag) {
+      if (sack_flag) {
+         *optptr++ = 4;		/* Kind=4 (SACKOK) */
+         *optptr++ = 2;		/* Len=2 bytes */
+      } else {
+         *optptr++ = 1;		/* Kind=1 (NOP) - pad */
+         *optptr++ = 1;		/* Kind=1 (NOP) - pad */
+      }
       *optptr++ = 8;		/* Kind=8 (TIMESTAMP) */
       *optptr++ = 10;		/* Len=10 bytes */
       *optptr++ = 0xde;		/* TS Value */
@@ -471,7 +469,20 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
       *optptr++ = 0;
       *optptr++ = 0;
       *optptr++ = 0;
-      options_len += 10;
+      options_len += 12;
+   } else if (sack_flag) {
+      *optptr++ = 1;		/* Kind=1 (NOP) - pad */
+      *optptr++ = 1;		/* Kind=1 (NOP) - pad */
+      *optptr++ = 4;		/* Kind=4 (SACKOK) */
+      *optptr++ = 2;		/* Len=2 bytes */
+      options_len += 4;
+   }
+   if (wscale_flag) {
+      *optptr++ = 1;		/* Kind=1 (NOP) - pad */
+      *optptr++ = 3;		/* Kind=3 (WSCALE) */
+      *optptr++ = 3;		/* Len=3 bytes */
+      *optptr++ = 0;		/* Value=0 */
+      options_len += 4;
    }
 /*
  *	Construct the pseudo header (for TCP checksum purposes).
