@@ -61,11 +61,11 @@ AC_CHECK_FUNC(getopt_long_only, ,
   [ COMPAT_SRCS="$COMPAT_SRCS getopt.c getopt1.c"
     COMPAT_OBJS="$COMPAT_OBJS getopt.o getopt1.o" ])
 
-dnl Add local libpcap library and includes.
+dnl Add libpcap library and includes.
 dnl FIXME: Don't hard-code directory paths here; call a macro to find the
 dnl FIXME: best libpcap library and header file, and check for minimum
 dnl FIXME: acceptable version like tcpdump does.
-CFLAGS="$CFLAGS -I/usr/local/src/libpcap-0.8.1 "
+CPPFLAGS="$CFLAGS -I/usr/local/src/libpcap-0.8.1 "
 LIBS="$LIBS /usr/local/src/libpcap-0.8.1/libpcap.a "
 
 AC_CONFIG_FILES([Makefile])
