@@ -121,7 +121,7 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    int i;
    unsigned char *cp;
    static int first_time_through=1;
-   struct iphdr iph;
+   struct iphdr *iph = (struct iphdr *) buf;
 /*
  *	Initialise static packet data.
  *	We can't do this in initialise() because local_data is not available
@@ -156,25 +156,22 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
 /*
  *	Construct the IP Header
  */
-   iph.ihl = 5;		/* 5 * 32-bit longwords = 20 bytes */
-   iph.version = 4;
-   iph.tos = 0;
-   iph.tot_len = sizeof(iph) + data_len;
-   iph.id = 0;		/* Linux kernel fills this in */
-   iph.frag_off = 0;
-   iph.ttl = 64;
-   iph.protocol = ip_protocol;
-   iph.check = 0;	/* Linux kernel fills this in */
-   iph.saddr = 0;	/* Linux kernel fills this in */
-   iph.daddr = he->addr.s_addr;
+   memset(iph, '\0', sizeof(struct iphdr));
+   iph->ihl = 5;	/* 5 * 32-bit longwords = 20 bytes */
+   iph->version = 4;
+   iph->tot_len = sizeof(struct iphdr) + data_len;
+   iph->id = 0;		/* Linux kernel fills this in */
+   iph->ttl = 64;
+   iph->protocol = ip_protocol;
+   iph->check = 0;	/* Linux kernel fills this in */
+   iph->saddr = 0;	/* Linux kernel fills this in */
+   iph->daddr = he->addr.s_addr;
 /*
  *	Copy the required data into the output buffer "buf" and set "buflen"
  *	to the number of bytes in this buffer.
  */
-   cp = buf;
-   buflen=sizeof(iph) + data_len;
-   memcpy(cp, &iph, sizeof(iph));
-   cp += sizeof(iph);
+   buflen=sizeof(struct iphdr) + data_len;
+   cp = buf + sizeof(struct iphdr);
    memcpy(cp, rawip_data, buflen);
 /*
  *	Update the last send times for this host.
