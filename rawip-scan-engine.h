@@ -86,12 +86,6 @@
 
 #define MAXLINE 255			/* Max line length for input files */
 #define MAXUDP 65507			/* Max UDP data size = 64k - 20 - 8 */
-#define DEFAULT_SELECT_TIMEOUT 5	/* Default select timeout in ms */
-#define DEFAULT_BACKOFF_FACTOR 1.5	/* Default timeout backoff factor */
-#define DEFAULT_RETRY 3			/* Default number of retries */
-#define DEFAULT_TIMEOUT 500		/* Default per-host timeout in ms */
-#define DEFAULT_INTERVAL 15		/* Default delay between packets (ms) */
-#define DEFAULT_SOURCE_PORT 0		/* Default UDP source port */
 #define SYSLOG 1			/* Use syslog if defined */
 #define SYSLOG_FACILITY LOG_USER	/* Syslog facility to use */
 
