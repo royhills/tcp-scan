@@ -88,6 +88,7 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
    int data_len;
    unsigned data_offset;
    char *df;
+   int optlen;
 /*
  *	Set msg to the IP address of the host entry, plus the address of the
  *	responder if different, and a tab.
@@ -134,7 +135,7 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
    }
    free(cp);
 /*
- *	Add TCP Flags, TTL, IPIP, and IP packet length to the message.
+ *	Add DF, TCP Flags, TTL, IPIP, and IP packet length to the message.
  */
    flags = NULL;
    if (tcph->cwr) {
@@ -210,7 +211,7 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
       }
    }
    if (!flags)
-      flags=make_message("");	/* Ensure flags not null if no TCP flags set */
+      flags=make_message("");	/* Ensure flags not NULL if no TCP flags set */
    if (ntohs(iph->frag_off) & 0x4000) {	/* If DF flag set */
       df = "yes";
    } else {
@@ -222,6 +223,80 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
                       ntohs(iph->tot_len));
    free(cp);
    free(flags);
+/*
+ *	Determine TCP options.
+ */
+   optlen = 4*(tcph->doff) - sizeof(struct tcphdr);
+   if (n - sizeof(struct iphdr) - sizeof(struct tcphdr) < optlen)
+      optlen = n - sizeof(struct iphdr) - sizeof(struct tcphdr);
+   if (ntohs(iph->tot_len) - sizeof(struct iphdr) - sizeof(struct tcphdr) < optlen)
+      optlen = ntohs(iph->tot_len) - sizeof(struct iphdr) - sizeof(struct tcphdr);
+   if (optlen) {
+      char *options=NULL;
+      unsigned char *optptr=(unsigned char *) (packet_in + ip_offset +
+                                               4*(iph->ihl) +
+                                               sizeof(struct tcphdr));
+      uint16_t *sptr;
+      unsigned char uc;
+
+      while (optlen > 0 && *optptr) {
+         switch (*optptr) {
+            case TCPOPT_EOL:
+               optlen--;
+               optptr++;
+               if (options) {
+                  cp = options;
+                  options = make_message("%s,EOL", cp);
+                  free(cp);
+               } else {
+                  options = make_message("EOL");
+               }
+               break;
+            case TCPOPT_NOP:
+               optlen--;
+               optptr++;
+               if (options) {
+                  cp = options;
+                  options = make_message("%s,NOP", cp);
+                  free(cp);
+               } else {
+                  options = make_message("NOP");
+               }
+               break;
+            case TCPOPT_MAXSEG:
+               optlen -= 4;
+               sptr = (uint16_t *) (optptr+2);
+               optptr += 4;
+               if (options) {
+                  cp = options;
+                  options = make_message("%s,MSS=%u", cp, ntohs(*sptr));
+                  free(cp);
+               } else {
+                  options = make_message("MSS=%u", ntohs(*sptr));
+               }
+               break;
+            default:
+               uc = *optptr;
+               if (options) {
+                  cp = options;
+                  options = make_message("%s,opt-%u", cp, uc);
+                  free(cp);
+               } else {
+                  options = make_message("opt-%u", uc);
+               }
+               uc = *(optptr+1);
+               optlen -= uc;
+               optptr += uc;
+               break;
+         }
+      }
+      if (!options)
+         options=make_message("");	/* Ensure options not NULL */
+      cp = msg;
+      msg = make_message("%s <%s>", cp, options);
+      free(cp);
+      free(options);
+   }
 /*
  *	Determine length of TCP data.  If this is non-zero, then display the
  *	data.
