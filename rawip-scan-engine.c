@@ -78,12 +78,12 @@ main(int argc, char *argv[]) {
    struct hostent *hp;
    struct timeval diff;		/* Difference between two timevals */
    unsigned select_timeout;	/* Select timeout */
-   unsigned long loop_timediff;	/* Time since last packet sent in ms */
-   unsigned long host_timediff; /* Time since last packet sent to this host */
+   unsigned long long loop_timediff;	/* Time since last packet sent in us */
+   unsigned long long host_timediff; /* Time since last pkt sent to this host (us) */
    int arg_str_space;		/* Used to avoid buffer overruns when copying */
    struct timeval last_packet_time;	/* Time last packet was sent */
    int req_interval;		/* Requested per-packet interval */
-   int cum_err;			/* Cumulative timing error */
+   int cum_err=0;		/* Cumulative timing error */
    struct timeval start_time;	/* Program start time */
    struct timeval end_time;	/* Program end time */
    struct timeval elapsed_time;	/* Elapsed time as timeval */
@@ -252,10 +252,11 @@ main(int argc, char *argv[]) {
       dump_list();
 /*
  *	Main loop: send packets to all hosts in order until a response
- *	has been received or the host has exhausted it's retry limit.
+ *	has been received or the host has exhausted its retry limit.
  *
  *	The loop exits when all hosts have either responded or timed out.
  */
+   interval *= 1000;	/* Convert from ms to us */
    reset_cum_err = 1;
    req_interval = interval;
    while (live_count) {
@@ -267,20 +268,20 @@ main(int argc, char *argv[]) {
       if ((gettimeofday(&now, NULL)) != 0)
          err_sys("gettimeofday");
 /*
- *	If the last packet was sent more than interval ms ago, then we can
+ *	If the last packet was sent more than interval us ago, then we can
  *	potentially send a packet to the current host.
  */
       timeval_diff(&now, &last_packet_time, &diff);
-      loop_timediff = 1000*diff.tv_sec + diff.tv_usec/1000;
+      loop_timediff = 1000000*diff.tv_sec + diff.tv_usec;
       if (loop_timediff >= req_interval) {
-         if (debug) {print_times(); printf("main: Can send packet now.  loop_timediff=%lu, req_interval=%d, cum_err=%d\n", loop_timediff, req_interval, cum_err);}
+         if (debug) {print_times(); printf("main: Can send packet now.  loop_timediff=%llu, req_interval=%d, cum_err=%d\n", loop_timediff, req_interval, cum_err);}
 /*
  *	If the last packet to this host was sent more than the current
- *	timeout for this host ms ago, then we can potentially send a packet
+ *	timeout for this host us ago, then we can potentially send a packet
  *	to it.
  */
          timeval_diff(&now, &(cursor->last_send_time), &diff);
-         host_timediff = 1000*diff.tv_sec + diff.tv_usec/1000;
+         host_timediff = 1000000*diff.tv_sec + diff.tv_usec;
          if (host_timediff >= cursor->timeout) {
             if (reset_cum_err) {
                if (debug) {print_times(); printf("main: Reset cum_err\n");}
@@ -295,7 +296,7 @@ main(int argc, char *argv[]) {
                   req_interval = 0;
                }
             }
-            if (debug) {print_times(); printf("main: Can send packet to host %d now.  host_timediff=%lu, timeout=%u\n", cursor->n, host_timediff, cursor->timeout);}
+            if (debug) {print_times(); printf("main: Can send packet to host %d now.  host_timediff=%llu, timeout=%u\n", cursor->n, host_timediff, cursor->timeout);}
             select_timeout = req_interval;
 /*
  *	If we've exceeded our retry limit, then this host has timed out so
@@ -323,11 +324,11 @@ main(int argc, char *argv[]) {
  */
             select_timeout = cursor->timeout - host_timediff;
             reset_cum_err = 1;	/* Zero cumulative error */
-            if (debug) {print_times(); printf("main: Can't send packet to host %d yet. host_timediff=%lu\n", cursor->n, host_timediff);}
+            if (debug) {print_times(); printf("main: Can't send packet to host %d yet. host_timediff=%llu\n", cursor->n, host_timediff);}
          } /* End If */
       } else {		/* We can't send a packet yet */
          select_timeout = req_interval - loop_timediff;
-         if (debug) {print_times(); printf("main: Can't send packet yet.  loop_timediff=%lu\n", loop_timediff);}
+         if (debug) {print_times(); printf("main: Can't send packet yet.  loop_timediff=%llu\n", loop_timediff);}
       } /* End If */
 
       n=recvfrom_wto(sockfd, packet_in, MAXUDP, (struct sockaddr *)&sa_peer, select_timeout);
@@ -419,7 +420,7 @@ add_host(char *name, unsigned timeout) {
    he->n = num_hosts;
    memcpy(&(he->addr), hp->h_addr_list[0], sizeof(struct in_addr));
    he->live = 1;
-   he->timeout = timeout;
+   he->timeout = timeout * 1000;	/* Convert from ms to us */
    he->num_sent = 0;
    he->num_recv = 0;
    he->last_send_time.tv_sec=0;
@@ -524,7 +525,7 @@ find_host_by_ip(struct host_entry *he,struct in_addr *addr) {
  *	buf	= Buffer to receive data read from socket.
  *	len	= Size of buffer.
  *	saddr	= Socket structure.
- *	tmo	= Select timeout in ms.
+ *	tmo	= Select timeout in us.
  *
  *	Returns number of characters received, or -1 for timeout.
  */
@@ -537,8 +538,8 @@ recvfrom_wto(int s, char *buf, int len, struct sockaddr *saddr, int tmo) {
 
    FD_ZERO(&readset);
    FD_SET(s, &readset);
-   to.tv_sec  = tmo/1000;
-   to.tv_usec = (tmo - 1000*to.tv_sec) * 1000;
+   to.tv_sec  = tmo/1000000;
+   to.tv_usec = (tmo - 1000000*to.tv_sec);
    n = select(s+1, &readset, NULL, NULL, &to);
    if (debug) {print_times(); printf("recvfrom_wto: select end, tmo=%d, n=%d\n", tmo, n);}
    if (n < 0) {
