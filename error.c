@@ -11,7 +11,7 @@
  *
  */
 
-#include "sql-slammer-scan.h"
+#include "udp-scan-engine.h"
 
 int daemon_proc;	/* Non-zero if process is a daemon */
 
