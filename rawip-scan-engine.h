@@ -85,7 +85,7 @@
 /* Defines */
 
 #define MAXLINE 255			/* Max line length for input files */
-#define MAXUDP 65507			/* Max UDP data size = 64k - 20 - 8 */
+#define MAXIP 65515			/* Max IP data size = 64k - 20 */
 #define SYSLOG 1			/* Use syslog if defined */
 #define SYSLOG_FACILITY LOG_USER	/* Syslog facility to use */
 
