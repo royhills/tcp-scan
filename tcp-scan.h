@@ -43,6 +43,17 @@
 
 /* Structures */
 
+struct tcp_flags_struct {
+   int cwr;
+   int ecn;
+   int urg;
+   int ack;
+   int psh;
+   int rst;
+   int syn;
+   int fin;
+};
+
 /* Functions */
 
 unsigned int hstr_i(char *);
@@ -50,3 +61,4 @@ uint16_t in_cksum(uint16_t *, int);
 uint32_t get_source_ip(char *);
 void add_host_port(char *, unsigned, unsigned);
 void create_port_list(char *);
+void process_tcp_flags(const char *);

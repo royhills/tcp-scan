@@ -48,9 +48,11 @@ int ignore_dups=0;			/* Don't display duplicate packets */
 int df_flag=DEFAULT_DF;			/* IP DF Flag */
 int ip_tos=DEFAULT_TOS;			/* IP TOS Field */
 int portname_flag=0;			/* Display port names */
+int tcp_flags_flag=0;			/* Specify outbound TCP flags */
+struct tcp_flags_struct tcp_flags;	/* Specified TCP flags */
 char **portnames=NULL;
 char const scanner_name[] = "tcp-scan";
-char const scanner_version[] = "1.9";
+char const scanner_version[] = "1.10";
 
 extern int verbose;	/* Verbose level */
 extern int debug;	/* Debug flag */
@@ -545,7 +547,26 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    tcph->dest = htons(he->dport);
    tcph->seq = htonl(seq_no);
    tcph->doff = (sizeof(struct tcphdr) + options_len) / 4;
-   tcph->syn = 1;
+   if (tcp_flags_flag) {	/* Set specified TCP flags */
+      if (tcp_flags.cwr)
+         tcph->cwr = 1;
+      if (tcp_flags.ecn)
+         tcph->ecn = 1;
+      if (tcp_flags.urg)
+         tcph->urg = 1;
+      if (tcp_flags.ack)
+         tcph->ack = 1;
+      if (tcp_flags.psh)
+         tcph->psh = 1;
+      if (tcp_flags.rst)
+         tcph->rst = 1;
+      if (tcp_flags.syn)
+         tcph->syn = 1;
+      if (tcp_flags.fin)
+         tcph->fin = 1;
+   } else {			/* Default: Set SYN flag */
+      tcph->syn = 1;
+   }
    tcph->window = htons(window);
    tcph->check = in_cksum((uint16_t *)pseudo, sizeof(struct pseudo_hdr) +
                  sizeof(struct tcphdr) + options_len);
@@ -845,8 +866,14 @@ local_help(void) {
    fprintf(stderr, "\t\t\tclears the DF flag.\n");
    fprintf(stderr, "\n--tos=<n> or -O <n>\tSet IP TOS (Type of Service) to <n>. Default=%d\n", DEFAULT_TOS);
    fprintf(stderr, "\t\t\tThis sets the TOS value in the IP header for outbound\n");
-   fprintf(stderr, "\t\t\tSYN packets.\n");
+   fprintf(stderr, "\t\t\tpackets.\n");
    fprintf(stderr, "\n--portname or -P\tDisplay port names as well as numbers.\n");
+   fprintf(stderr, "\n--flags=<f> or -L <f>\tSpecify TCP flags to be set in outgoing packets.\n");
+   fprintf(stderr, "\t\t\tThe flags should be specified as a comma-separated list\n");
+   fprintf(stderr, "\t\t\tfrom the set of: CWR,ECN,URG,ACK,PSH,RST,SYN,FIN.\n");
+   fprintf(stderr, "\t\t\tIf this option is not specified, the flags default\n");
+   fprintf(stderr, "\t\t\tto SYN.\n");
+
 }
 
 /*
@@ -1275,9 +1302,11 @@ local_process_options(int argc, char *argv[]) {
       {"random", no_argument, 0, 'R'},
       {"numeric", no_argument, 0, 'N'},
       {"portname", no_argument, 0, 'P'},
+      {"flags", required_argument, 0, 'L'},
       {0, 0, 0, 0}
    };
-   const char *short_options = "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:WaTn:l:I:qgF:O:RNP";
+   const char *short_options =
+      "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:WaTn:l:I:qgF:O:RNPL:";
    int arg;
    int options_index=0;
 
@@ -1394,6 +1423,11 @@ local_process_options(int argc, char *argv[]) {
          case 'P':	/* --portname */
             portname_flag=1;
             break;
+         case 'L':	/* --flags */
+            tcp_flags_flag=1;
+            process_tcp_flags(optarg);
+/* CWR,ECN,URG,ACK,PSH,RST,SYN,FIN */
+            break;
          default:	/* Unknown option */
             usage();
             break;
@@ -1471,4 +1505,73 @@ create_port_list(char *filename) {
       port_list=Malloc(sizeof(uint16_t));
    }
    port_list[nports] = 0;	/* Mark end of list with zero */
+}
+
+/*
+ *	process_tcp_flags	-- Process TCP flags option
+ *
+ *	Inputs:
+ *
+ *	optarg		Pointer to the --flags option argument.
+ *
+ *	Outputs:
+ *
+ *	None.
+ *
+ *	This function sets "tcp_flags" to the TCP flags specified by the
+ *	--flags option.  It also sets the tcp_flags_flag flag to show that
+ *	the specified TCP flags should be used.
+ */
+void
+process_tcp_flags(const char *optarg) {
+   const char *cp1;
+   char *cp2;
+   int count;
+   char flag_list[MAXLINE];
+
+   tcp_flags_flag=1;
+   count=0;
+   cp1 = optarg;
+   cp2 = flag_list;
+   while (*cp1 != '\0') {
+      if (!isspace((unsigned char)*cp1)) {
+         *cp2++ = tolower((unsigned char)*cp1);
+         count++;
+      }
+      cp1++;
+   }
+   *cp2 = '\0';
+
+   if (strstr(flag_list, "cwr"))
+      tcp_flags.cwr = 1;
+   else
+      tcp_flags.cwr = 0;
+   if (strstr(flag_list, "ecn"))
+      tcp_flags.ecn = 1;
+   else
+      tcp_flags.ecn = 0;
+   if (strstr(flag_list, "urg"))
+      tcp_flags.urg = 1;
+   else
+      tcp_flags.urg = 0;
+   if (strstr(flag_list, "ack"))
+      tcp_flags.ack = 1;
+   else
+      tcp_flags.ack = 0;
+   if (strstr(flag_list, "psh"))
+      tcp_flags.psh = 1;
+   else
+      tcp_flags.psh = 0;
+   if (strstr(flag_list, "rst"))
+      tcp_flags.rst = 1;
+   else
+      tcp_flags.rst = 0;
+   if (strstr(flag_list, "syn"))
+      tcp_flags.syn = 1;
+   else
+      tcp_flags.syn = 0;
+   if (strstr(flag_list, "fin"))
+      tcp_flags.fin = 1;
+   else
+      tcp_flags.fin = 0;
 }
