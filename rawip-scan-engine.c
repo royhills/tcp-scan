@@ -68,7 +68,7 @@ main(int argc, char *argv[]) {
    int sockfd;			/* IP socket file descriptor */
    struct sockaddr_in sa_peer;
    struct timeval now;
-   char packet_in[MAXIP];	/* Received packet */
+   unsigned char packet_in[MAXIP];	/* Received packet */
    int n;
    char namebuf[MAXLINE];
    struct host_entry *temp_cursor;
@@ -354,7 +354,7 @@ main(int argc, char *argv[]) {
  *	Note: We start at cursor->prev because we call advance_cursor() after
  *	      each send_packet().
  */
-         temp_cursor=find_host_by_ip(cursor->prev, &(sa_peer.sin_addr));
+         temp_cursor=find_host(cursor->prev, &(sa_peer.sin_addr), packet_in, n);
          if (temp_cursor) {
 /*
  *	We found an IP match for the packet. 
@@ -389,14 +389,15 @@ main(int argc, char *argv[]) {
                       elapsed_time.tv_usec/1000) / 1000.0;
 
 #ifdef SYSLOG
-   info_syslog("Ending: %u hosts scanned in %.3f seconds. %u responded",
-               num_hosts, elapsed_seconds, responders);
+   info_syslog("Ending: %u hosts scanned in %.3f seconds (%.2f hosts/sec). %u responded",
+               num_hosts, elapsed_seconds, num_hosts/elapsed_seconds,
+               responders);
 #endif
-   printf("Ending %s %s (%s): %u hosts scanned in %.3f seconds.  %u responded\n",
-          scanner_name, scanner_version, PACKAGE_STRING, num_hosts,
-          elapsed_seconds, responders);
+   printf("Ending %s: %u hosts scanned in %.3f seconds (%.2f hosts/sec).  %u responded\n",
+          scanner_name, num_hosts, elapsed_seconds, num_hosts/elapsed_seconds,
+          responders);
    if (debug) {print_times(); printf("main: End\n");}
-   return(0);
+   return 0;
 }
 
 /*
@@ -493,22 +494,39 @@ advance_cursor(void) {
 }
 
 /*
- *	find_host_by_ip	-- Find a host in the list by IP address
+ *	find_host	-- Find a host in the list
  *
  *	Inputs:
  *
- *	he =	Pointer to the current position in the list.  Search runs
+ *	he 	Pointer to the current position in the list.  Search runs
  *		backwards starting from this point.
- *	addr =	The IP address to find.
+ *	addr 	The source IP address that the packet came from.
+ *	packet_in The received packet data.
+ *	n	The length of the received packet.
  *
  *	Returns a pointer to the host entry associated with the specified IP
  *	or NULL if no match found.
+ *
+ *	This routine will normally find the host by IP address by comparing
+ *	"addr" against "he->addr" for each entry in the list.  In this case,
+ *	"packet_in" and "n" are not used.  However, it is  possible for
+ *	the protocol-specific "local_find_host()" routine to override this
+ *	generic routine, and the protocol specific routine may use "packet_in"
+ *	and "n".
  */
 struct host_entry *
-find_host_by_ip(struct host_entry *he,struct in_addr *addr) {
+find_host(struct host_entry *he, struct in_addr *addr,
+          unsigned char *packet_in, int n) {
    struct host_entry *p;
    int found = 0;
    unsigned iterations = 0;	/* Used for debugging */
+/*
+ *	Return with the result from local_find_host if the local find_host
+ *	function replaces this one.
+ */
+   if (local_find_host(&p, he, addr, packet_in, n)) {
+      return p;
+   }
 
    p = he;
 
@@ -520,7 +538,7 @@ find_host_by_ip(struct host_entry *he,struct in_addr *addr) {
          p = p->prev;
    } while (!found && p != he);
 
-   if (debug) {print_times(); printf("find_host_by_ip: found=%d, iterations=%u\n", found, iterations);}
+   if (debug) {print_times(); printf("find_host: found=%d, iterations=%u\n", found, iterations);}
 
    if (found)
       return p;
@@ -542,7 +560,8 @@ find_host_by_ip(struct host_entry *he,struct in_addr *addr) {
  *	Returns number of characters received, or -1 for timeout.
  */
 int
-recvfrom_wto(int s, char *buf, int len, struct sockaddr *saddr, int tmo) {
+recvfrom_wto(int s, unsigned char *buf, int len, struct sockaddr *saddr,
+             int tmo) {
    fd_set readset;
    struct timeval to;
    int n;
