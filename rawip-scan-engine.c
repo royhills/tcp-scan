@@ -89,6 +89,7 @@ main(int argc, char *argv[]) {
    struct timeval elapsed_time;	/* Elapsed time as timeval */
    double elapsed_seconds;	/* Elapsed time in seconds */
    static int reset_cum_err;
+   static int pass_no;
 /*
  *	Open syslog channel and log arguments if required.
  *	We must be careful here to avoid overflowing the arg_str buffer
@@ -274,7 +275,7 @@ main(int argc, char *argv[]) {
       timeval_diff(&now, &last_packet_time, &diff);
       loop_timediff = 1000000*diff.tv_sec + diff.tv_usec;
       if (loop_timediff >= req_interval) {
-         if (debug) {print_times(); printf("main: Can send packet now.  loop_timediff=%llu, req_interval=%d, cum_err=%d\n", loop_timediff, req_interval, cum_err);}
+         if (debug) {print_times(); printf("main: Can send packet now.  loop_timediff=%llu\n", loop_timediff);}
 /*
  *	If the last packet to this host was sent more than the current
  *	timeout for this host us ago, then we can potentially send a packet
@@ -296,7 +297,7 @@ main(int argc, char *argv[]) {
                   req_interval = 0;
                }
             }
-            if (debug) {print_times(); printf("main: Can send packet to host %d now.  host_timediff=%llu, timeout=%u\n", cursor->n, host_timediff, cursor->timeout);}
+            if (debug) {print_times(); printf("main: Can send packet to host %d now.  host_timediff=%llu, timeout=%u, req_interval=%d, cum_err=%d\n", cursor->n, host_timediff, cursor->timeout, req_interval, cum_err);}
             select_timeout = req_interval;
 /*
  *	If we've exceeded our retry limit, then this host has timed out so
@@ -304,8 +305,12 @@ main(int argc, char *argv[]) {
  *	backoff factor if this is not the first packet sent to this host
  *	and send a packet.
  */
+            if (verbose && cursor->num_sent > pass_no) {
+               warn_msg("---\tPass %d complete", pass_no+1);
+               pass_no = cursor->num_sent;
+            }
             if (cursor->num_sent >= retry) {
-               if (verbose)
+               if (verbose > 1)
                   warn_msg("---\tRemoving host entry %u (%s) - Timeout", cursor->n, inet_ntoa(cursor->addr));
                if (debug) {print_times(); printf("main: Timing out host %d.\n", cursor->n);}
                remove_host(cursor);	/* Automatically calls advance_cursor() */
@@ -352,7 +357,7 @@ main(int argc, char *argv[]) {
                warn_msg("---\tReceived packet #%u from %s",temp_cursor->num_recv ,inet_ntoa(sa_peer.sin_addr));
             display_packet(n, packet_in, temp_cursor, &(sa_peer.sin_addr));
             responders++;
-            if (verbose)
+            if (verbose > 1)
                warn_msg("---\tRemoving host entry %u (%s) - Received %d bytes", temp_cursor->n, inet_ntoa(sa_peer.sin_addr), n);
             remove_host(temp_cursor);
          } else {
