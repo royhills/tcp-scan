@@ -35,6 +35,7 @@
 #define TO_MS 0				/* Timeout for pcap_open_live() */
 #define OPTIMISE 1			/* Optimise pcap filter */
 #define DEFAULT_WINDOW 5840		/* TCP Window */
+#define DEFAULT_MSS 0			/* TCP MSS */
 
 /* Structures */
 
