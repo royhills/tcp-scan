@@ -1,5 +1,5 @@
 /*
- * The TCP Scanner (tcp-scan) is Copyright (C) 2003-2004 Roy Hills,
+ * The TCP Scanner (tcp-scan) is Copyright (C) 2003-2005 Roy Hills,
  * NTA Monitor Ltd.
  *
  * $Id$
