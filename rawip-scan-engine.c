@@ -424,7 +424,7 @@ remove_host(struct host_entry **he) {
    if ((*he)->live) {
       (*he)->live = 0;
       live_count--;
-      if (he == cursor)
+      if (*he == *cursor)
          advance_cursor();
       if (debug) {print_times(); printf("remove_host: live_count now %d\n", live_count);}
    } else {
