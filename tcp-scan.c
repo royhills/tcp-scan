@@ -594,7 +594,7 @@ local_add_host(char *name, unsigned timeout) {
       } else if (*cp == '-') {		/* Inclusive range */
          cp++;
          port2=strtoul(cp, &cp, 10);
-         if (!port2)	/* Generally caused by omitting end of range */
+         if (!port2 || port2 <= port1)	/* Missing end or empty range */
             err_msg("Invalid port specification: %s", port_spec);
          for (i=port1; i<=port2; i++)
             add_host_port(name, timeout, i);
