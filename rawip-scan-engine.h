@@ -97,7 +97,7 @@ struct host_entry {
    struct in_addr addr;		/* Host IP address */
    u_char live;			/* Set when awaiting response */
    struct timeval last_send_time; /* Time when last packet sent to this addr */
-   unsigned timeout;		/* Timeout for this host in ms */
+   unsigned timeout;		/* Timeout for this host in us */
    unsigned short num_sent;	/* Number of packets sent */
    unsigned short num_recv;	/* Number of packets received */
    void *local_host_data;	/* Protocol-specific data */
