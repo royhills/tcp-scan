@@ -82,6 +82,8 @@
 #include <arpa/inet.h>
 #endif
 
+#include <pcap.h>
+
 /* Defines */
 
 #define MAXLINE 255			/* Max line length for input files */
@@ -114,12 +116,12 @@ void err_print(int, int, const char *, va_list);
 void usage(void);
 void add_host(char *, unsigned);
 void send_packet(int, struct host_entry *, int, struct timeval *);
-int recvfrom_wto(int, unsigned char *, int, struct sockaddr *, int);
+void recvfrom_wto(int, unsigned char *, int, struct sockaddr *, int);
 void remove_host(struct host_entry *);
 void timeval_diff(struct timeval *, struct timeval *, struct timeval *);
 struct host_entry *find_host(struct host_entry *, struct in_addr *,
-                             unsigned char *, int);
-void display_packet(int, unsigned char *, struct host_entry *,
+                             const unsigned char *, int);
+void display_packet(int, const unsigned char *, struct host_entry *,
                     struct in_addr *);
 void advance_cursor(void);
 void dump_list(void);
@@ -131,8 +133,9 @@ void local_version(void);
 void local_help(void);
 int local_add_host(char *, unsigned);
 int local_find_host(struct host_entry **, struct host_entry *,
-                    struct in_addr *, unsigned char *, int);
+                    struct in_addr *, const unsigned char *, int);
 char *make_message(const char *, ...);
+void callback(u_char *, const struct pcap_pkthdr *, const u_char *);
 /* Wrappers */
 int Gettimeofday(struct timeval *);
 void *Malloc(size_t);

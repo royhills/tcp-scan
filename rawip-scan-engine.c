@@ -36,6 +36,7 @@ unsigned max_iter;			/* Max iterations in find_host() */
 int verbose=0;				/* Verbose level */
 int debug = 0;				/* Debug flag */
 char *local_data=NULL;			/* Local data for scanner */
+pcap_t *handle;
 
 extern unsigned interval;		/* Desired interval between packets */
 extern char const scanner_name[];	/* Scanner Name */
@@ -71,9 +72,7 @@ main(int argc, char *argv[]) {
    struct sockaddr_in sa_peer;
    struct timeval now;
    unsigned char packet_in[MAXIP];	/* Received packet */
-   int n;
    char namebuf[MAXLINE];
-   struct host_entry *temp_cursor;
    struct hostent *hp;
    struct timeval diff;		/* Difference between two timevals */
    unsigned select_timeout;	/* Select timeout */
@@ -117,11 +116,6 @@ main(int argc, char *argv[]) {
  *	Get program start time for statistics displayed on completion.
  */
    Gettimeofday(&start_time);
-/*
- *	Call protocol-specific initialisation routine to perform any
- *	initial setup required.
- */
-   initialise();
 /*
  *	Process options and arguments.
  */
@@ -169,6 +163,11 @@ main(int argc, char *argv[]) {
       }
    }
    if (debug) {print_times(); printf("main: Start\n");}
+/*
+ *	Call protocol-specific initialisation routine to perform any
+ *	initial setup required.
+ */
+   initialise();
 /*
  *	If we're not reading from a file, then we must have some hosts
  *	given as command line arguments.
@@ -340,41 +339,7 @@ main(int argc, char *argv[]) {
          if (debug) {print_times(); printf("main: Can't send packet yet.  loop_timediff=%llu\n", loop_timediff);}
       } /* End If */
 
-      n=recvfrom_wto(sockfd, packet_in, MAXIP, (struct sockaddr *)&sa_peer, select_timeout);
-      if (n != -1) {
-/*
- *	We've received a response.  Try to match up the packet by IP address
- *
- *	Note: If the protocol includes a unique ID with a large enough range
- *	      i.e. 32 bits or more, we could match by that instead of IP
- *	      address.  We do this with ike-scan using the 64-bit cookie value.
- *
- *	Note: We start at cursor->prev because we call advance_cursor() after
- *	      each send_packet().
- */
-         temp_cursor=find_host(cursor->prev, &(sa_peer.sin_addr), packet_in, n);
-         if (temp_cursor) {
-/*
- *	We found an IP match for the packet. 
- */
-            if (verbose > 1)
-               warn_msg("---\tReceived packet #%u from %s",temp_cursor->num_recv ,inet_ntoa(sa_peer.sin_addr));
-            display_packet(n, packet_in, temp_cursor, &(sa_peer.sin_addr));
-            responders++;
-            if (verbose > 1)
-               warn_msg("---\tRemoving host entry %u (%s) - Received %d bytes", temp_cursor->n, inet_ntoa(sa_peer.sin_addr), n);
-            remove_host(temp_cursor);
-         } else {
-/*
- *	The received packet is not from an IP address in the list
- *	Issue a message to that effect and ignore the packet.
- *	We only issue a message if verbose > 1 because these events are
- *	very common with rawip.
- */
-            if (verbose > 1)
-               warn_msg("---\tIgnoring %d bytes from unknown host %s", n, inet_ntoa(sa_peer.sin_addr));
-         }
-      } /* End If */
+      recvfrom_wto(sockfd, packet_in, MAXIP, (struct sockaddr *)&sa_peer, select_timeout);
    } /* End While */
 
    printf("\n");        /* Ensure we have a blank line */
@@ -514,7 +479,7 @@ advance_cursor(void) {
  */
 struct host_entry *
 find_host(struct host_entry *he, struct in_addr *addr,
-          unsigned char *packet_in, int n) {
+          const unsigned char *packet_in, int n) {
    struct host_entry *p;
    int found = 0;
    unsigned iterations = 0;	/* Used for debugging */
@@ -557,13 +522,12 @@ find_host(struct host_entry *he, struct in_addr *addr,
  *
  *	Returns number of characters received, or -1 for timeout.
  */
-int
+void
 recvfrom_wto(int s, unsigned char *buf, int len, struct sockaddr *saddr,
              int tmo) {
    fd_set readset;
    struct timeval to;
    int n;
-   NET_SIZE_T saddr_len;
 
    FD_ZERO(&readset);
    FD_SET(s, &readset);
@@ -574,22 +538,10 @@ recvfrom_wto(int s, unsigned char *buf, int len, struct sockaddr *saddr,
    if (n < 0) {
       err_sys("select");
    } else if (n == 0) {
-      return -1;	/* Timeout */
+      return;	/* Timeout */
    }
-   saddr_len = sizeof(struct sockaddr);
-   if ((n = recvfrom(s, buf, len, 0, saddr, &saddr_len)) < 0) {
-      if (errno == ECONNREFUSED) {
-/*
- *	Treat connection refused as timeout.
- *	It would be nice to remove the associated host, but we can't because
- *	we cannot tell which host the connection refused relates to.
- */
-         return -1;
-      } else {
-         err_sys("recvfrom");
-      }
-   }
-   return n;
+   if ((pcap_dispatch(handle, -1, callback, NULL)) < 0)
+      err_sys("pcap_dispatch: %s\n", pcap_geterr(handle));
 }
 
 /*

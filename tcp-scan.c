@@ -33,7 +33,7 @@ float backoff_factor = DEFAULT_BACKOFF_FACTOR;	/* Backoff factor */
 uint32_t seq_no;			/* Initial TCP sequence number */
 uint16_t source_port;			/* TCP Source Port */
 char const scanner_name[] = "tcp-scan";
-char const scanner_version[] = "1.1";
+char const scanner_version[] = "1.2";
 
 extern int verbose;	/* Verbose level */
 extern int debug;	/* Debug flag */
@@ -42,6 +42,13 @@ extern struct host_entry *rrlist;	/* Round-robin linked list "the list" */
 extern unsigned num_hosts;		/* Number of entries in the list */
 extern unsigned rejected;		/* Packets rejected because not ours */
 extern unsigned max_iter;		/* Max iterations in find_host() */
+extern pcap_t *handle;
+extern struct host_entry *cursor;
+extern unsigned responders;		/* Number of hosts which responded */
+
+static uint32_t source_address;
+static int pcap_fd;			/* pcap File Descriptor */
+static size_t ip_offset;		/* Offset to IP header in pcap pkt */
 
 /*
  *	display_packet -- Check and display received packet
@@ -61,9 +68,9 @@ extern unsigned max_iter;		/* Max iterations in find_host() */
  *      was received in the format: <IP-Address><TAB><Details>.
  */
 void
-display_packet(int n, unsigned char *packet_in, struct host_entry *he,
+display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
                struct in_addr *recv_addr) {
-   struct iphdr *iph = (struct iphdr *) packet_in;
+   struct iphdr *iph;
    struct tcphdr *tcph;
    char *msg;
    char *cp;
@@ -81,17 +88,19 @@ display_packet(int n, unsigned char *packet_in, struct host_entry *he,
 /*
  *	Check that the packet is large enough to decode.
  */
-   if (n < sizeof(struct iphdr) + sizeof(struct tcphdr)) {
+   if (n < ip_offset + sizeof(struct iphdr) + sizeof(struct tcphdr)) {
       printf("%s%d byte packet too short to decode\n", msg, n);
       free(msg);
       return;
    }
 /*
- *	Set tcph to start of TCP header.
- *	Note that iph.ihl is in 32-bit units.  We multiply by 4 to get bytes.
- *	iph.lhl is normally 5, but can be larger if IP options are present.
+ *      Overlay IP and TCP headers on packet buffer.
+ *      ip_offset is size of layer-2 header.
+ *      Note that iph.ihl is in 32-bit units.  We multiply by 4 to get bytes.
+ *      iph.lhl is normally 5, but can be larger if IP options are present.
  */
-   tcph = (struct tcphdr *) (packet_in + 4*(iph->ihl));
+   iph = (struct iphdr *) (packet_in + ip_offset);
+   tcph = (struct tcphdr *) (packet_in + ip_offset + 4*(iph->ihl));
 /*
  *	Add TCP port to message.
  */
@@ -207,11 +216,8 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    struct sockaddr_in sa_peer;
    char buf[MAXIP];
    int buflen;
-   char *if_name;
    NET_SIZE_T sa_peer_len;
    struct tcp_data *tdp;
-   static int first_time_through=1;
-   static uint32_t source_address;
    struct iphdr *iph = (struct iphdr *) buf;
    struct tcphdr *tcph = (struct tcphdr *) (buf + sizeof(struct iphdr));
    struct pseudo_hdr {	/* For computing TCP checksum */
@@ -224,18 +230,6 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    /* Position pseudo header just before the TCP header */
    struct pseudo_hdr *pseudo = (struct pseudo_hdr *) (buf + sizeof(struct ip) -
    sizeof(struct pseudo_hdr));
-/*
- *	Determine source IP address.
- *	We can't do this in initialise() because local_data is not available
- *	in that function.
- */
-   if (first_time_through) {
-      if (!(if_name=getenv("RMIF")))
-         if_name="eth0";
-      source_address = get_source_ip(if_name);
-      printf("Using interface %s\n", if_name);
-      first_time_through=0;
-   }
 /*
  *	Check that the host is live.  Complain if not.
  */
@@ -332,6 +326,14 @@ initialise(void) {
    struct utsname uname_buf;
    char str[MAXLINE];
    md5_byte_t md5_digest[16];		/* MD5 hash used as random source */
+   char *if_name;			/* Interface name, e.g. "eth0" */
+   char errbuf[PCAP_ERRBUF_SIZE];
+   struct bpf_program filter;
+   char *filter_string;
+   bpf_u_int32 netmask;
+   bpf_u_int32 localnet;
+   int datalink;
+
 /*
  *	Create an MD5 hash of various things to use as a source of random
  *	data.
@@ -357,6 +359,45 @@ initialise(void) {
    memcpy(&seq_no, md5_digest, sizeof(uint32_t));
    memcpy(&source_port, md5_digest+sizeof(uint32_t), sizeof(uint16_t));
    source_port |= 0x8000;
+/*
+ *	Determine source interface and associated IP address.
+ */
+   if (!(if_name=getenv("RMIF")))
+      if_name="eth0";
+   source_address = get_source_ip(if_name);
+/*
+ *	Prepare pcap
+ */
+   filter_string=make_message("tcp dst port %u and tcp[8:4] = %u",
+                              source_port, seq_no+1);
+   printf("BPF Filter string: %s\n", filter_string);
+   if (!(handle = pcap_open_live(if_name, SNAPLEN, PROMISC, TO_MS, errbuf)))
+      err_msg("pcap_open_live: %s\n", errbuf);
+   if ((datalink=pcap_datalink(handle)) < 0)
+      err_msg("pcap_datalink: %s\n", pcap_geterr(handle));
+   printf("Interface: %s, datalink type: %s\n", if_name,
+          pcap_datalink_val_to_description(datalink));
+   switch (datalink) {
+      case DLT_EN10MB:
+         ip_offset = 14;
+         break;
+      case DLT_PPP:
+         ip_offset = 4;
+         break;
+      default:
+         err_msg("Unsupported datalink type");
+         break;
+   }
+   if ((pcap_fd=pcap_fileno(handle)) < 0)
+      err_msg("pcap_fileno: %s\n", pcap_geterr(handle));
+   if ((pcap_setnonblock(handle, 1, errbuf)) < 0)
+      err_msg("pcap_setnonblock: %s\n", errbuf);
+   if (pcap_lookupnet(if_name, &localnet, &netmask, errbuf) < 0)
+      err_msg("pcap_lookupnet: %s\n", errbuf);
+   if ((pcap_compile(handle, &filter, filter_string, OPTIMISE, netmask)) < 0)
+      err_msg("pcap_geterr: %s\n", pcap_geterr(handle));
+   if ((pcap_setfilter(handle, &filter)) < 0)
+      err_msg("pcap_setfilter: %s\n", pcap_geterr(handle));
 }
 
 /*
@@ -647,8 +688,8 @@ uint32_t get_source_ip(char *devname) {
  */
 int
 local_find_host(struct host_entry **ptr, struct host_entry *he,
-                struct in_addr *addr, unsigned char *packet_in, int n) {
-   struct iphdr *iph = (struct iphdr *) packet_in;
+                struct in_addr *addr, const unsigned char *packet_in, int n) {
+   struct iphdr *iph;
    struct tcphdr *tcph;
    struct host_entry *p;
    int found = 0;
@@ -657,24 +698,18 @@ local_find_host(struct host_entry **ptr, struct host_entry *he,
 /*
  *      Don't try to match if packet is too short.
  */
-   if (n < sizeof(struct iphdr) + sizeof(struct tcphdr)) {
+   if (n < ip_offset + sizeof(struct iphdr) + sizeof(struct tcphdr)) {
       *ptr = NULL;
       return 1;
    }
 /*
- *	Set tcph to start of TCP header.
- *	Note that iph.ihl is in 32-bit units.  We multiply by 4 to get bytes.
- *	iph.lhl is normally 5, but can be larger if IP options are present.
+ *      Overlay IP and TCP headers on packet buffer.
+ *      ip_offset is size of layer-2 header.
+ *      Note that iph.ihl is in 32-bit units.  We multiply by 4 to get bytes.
+ *      iph.lhl is normally 5, but can be larger if IP options are present.
  */
-   tcph = (struct tcphdr *) (packet_in + 4*(iph->ihl));
-/*
- *	Don't try to match if it's not a response to one of our packets.
- */
-   if ((ntohl(tcph->ack_seq)) != seq_no+1 || (ntohs(tcph->dest) != source_port)) {
-      *ptr = NULL;
-      rejected++;
-      return 1;
-   }
+   iph = (struct iphdr *) (packet_in + ip_offset);
+   tcph = (struct tcphdr *) (packet_in + ip_offset + 4*(iph->ihl));
 /*
  *      Don't try to match if host ptr is NULL.
  *      This should never happen, but we check just in case.
@@ -684,7 +719,7 @@ local_find_host(struct host_entry **ptr, struct host_entry *he,
       return 1;
    }
 /*
- *	It looks like a valid response, so try to match against out host list.
+ *	Try to match against out host list.
  */
    p = he;
    do {
@@ -708,4 +743,60 @@ local_find_host(struct host_entry **ptr, struct host_entry *he,
       *ptr = NULL;
 
    return 1;
+}
+
+void
+callback(u_char *args, const struct pcap_pkthdr *header,
+         const u_char *packet_in) {
+   struct iphdr *iph;
+   struct tcphdr *tcph;
+   int n = header->caplen;
+   struct in_addr source_ip;
+   struct host_entry *temp_cursor;
+
+/*
+ *      Check that the packet is large enough to decode.
+ */
+   if (n < ip_offset + sizeof(struct iphdr) + sizeof(struct tcphdr)) {
+      printf("%d byte packet too short to decode\n", n);
+      return;
+   }
+/*
+ *	Overlay IP and TCP headers on packet buffer.
+ *	ip_offset is size of layer-2 header.
+ *      Note that iph.ihl is in 32-bit units.  We multiply by 4 to get bytes.
+ *      iph.lhl is normally 5, but can be larger if IP options are present.
+ */
+   iph = (struct iphdr *) (packet_in + ip_offset);
+   tcph = (struct tcphdr *) (packet_in + ip_offset + 4*(iph->ihl));
+/*
+ *	Determine source IP address.
+ */
+   source_ip.s_addr = iph->saddr;
+/*
+ *	We've received a response.  Try to match up the packet by IP address
+ *
+ *	Note: We start at cursor->prev because we call advance_cursor() after
+ *	      each send_packet().
+ */
+         temp_cursor=find_host(cursor->prev, &source_ip, packet_in, n);
+         if (temp_cursor) {
+/*
+ *	We found an IP match for the packet. 
+ */
+            if (verbose > 1)
+               warn_msg("---\tReceived packet #%u from %s",temp_cursor->num_recv ,inet_ntoa(source_ip));
+            display_packet(n, packet_in, temp_cursor, &source_ip);
+            responders++;
+            if (verbose > 1)
+               warn_msg("---\tRemoving host entry %u (%s) - Received %d bytes", temp_cursor->n, inet_ntoa(source_ip), n);
+            remove_host(temp_cursor);
+         } else {
+/*
+ *	The received packet is not from an IP address in the list
+ *	Issue a message to that effect and ignore the packet.
+ */
+            if (verbose)
+               warn_msg("---\tIgnoring %d bytes from unknown host %s", n, inet_ntoa(source_ip));
+         }
 }
