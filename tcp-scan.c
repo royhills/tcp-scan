@@ -45,6 +45,8 @@ int ip_ttl = DEFAULT_TTL;		/* IP TTL */
 char *if_name=NULL;			/* Interface name, e.g. "eth0" */
 int quiet_flag=0;			/* Don't decode the packet */
 int ignore_dups=0;			/* Don't display duplicate packets */
+int df_flag=DEFAULT_DF;			/* IP DF Flag */
+int ip_tos=DEFAULT_TOS;			/* IP TOS Field */
 char const scanner_name[] = "tcp-scan";
 char const scanner_version[] = "1.6";
 
@@ -545,9 +547,13 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    memset(iph, '\0', sizeof(struct iphdr));
    iph->ihl = 5;	/* 5 * 32-bit longwords = 20 bytes */
    iph->version = 4;
+   iph->tos = ip_tos;
    iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr);
    iph->id = 0;		/* Linux kernel fills this in */
-   iph->frag_off = htons(0x4000);	/* Don't fragment */
+   if (df_flag)
+      iph->frag_off = htons(0x4000);
+   else
+      iph->frag_off = htons(0x0);
    iph->ttl = ip_ttl;
    iph->protocol = ip_protocol;
    iph->check = 0;	/* Linux kernel fills this in */
@@ -789,6 +795,13 @@ local_help(void) {
    fprintf(stderr, "\t\t\tBy default, duplicate packets are displayed and flagged\n");
    fprintf(stderr, "\t\t\twith \"(DUP: n)\" where n is the number of packets\n");
    fprintf(stderr, "\t\t\treceived from that host so far.\n");
+   fprintf(stderr, "\n--df=<n> or -F <n>\tEnable (1) or disable (0) DF flag. Default=%d\n", DEFAULT_DF);
+   fprintf(stderr, "\t\t\tSetting this option to 1 sets the DF flag in the IP\n");
+   fprintf(stderr, "\t\t\theader of the outbound SYN packets.  Setting it to 0\n");
+   fprintf(stderr, "\t\t\tclears the DF flag.\n");
+   fprintf(stderr, "\n--tos=<n> or -O <n>\tSet IP TOS (Type of Service) to <n>. Default=%d\n", DEFAULT_TOS);
+   fprintf(stderr, "\t\t\tThis sets the TOS value in the IP header for outbound\n");
+   fprintf(stderr, "\t\t\tSYN packets.\n");
 }
 
 /*
@@ -1223,9 +1236,11 @@ local_process_options(int argc, char *argv[]) {
       {"interface", required_argument, 0, 'I'},
       {"quiet", no_argument, 0, 'q'},
       {"ignoredups", no_argument, 0, 'g'},
+      {"df", required_argument, 0, 'F'},
+      {"tos", required_argument, 0, 'O'},
       {0, 0, 0, 0}
    };
-   const char *short_options = "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:WaTn:l:I:qg";
+   const char *short_options = "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:WaTn:l:I:qgF:O:";
    int arg;
    int options_index=0;
 
@@ -1312,6 +1327,16 @@ local_process_options(int argc, char *argv[]) {
             break;
          case 'g':	/* --ignoredups */
             ignore_dups=1;
+            break;
+         case 'F':	/* --df */
+            df_flag = strtol(optarg, (char **)NULL, 0);
+            if (df_flag < 0 || df_flag > 1)
+               err_msg("The --df option must be 0 (DF off) or 1 (DF on).");
+            break;
+         case 'O':	/* --tos */
+            ip_tos = strtol(optarg, (char **)NULL, 0);
+            if (ip_tos < 0 || ip_tos > 255)
+               err_msg("The --tos option must be in the range 0 to 255.");
             break;
          default:	/* Unknown option */
             usage();
