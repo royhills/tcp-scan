@@ -65,33 +65,57 @@ display_packet(int n, unsigned char *packet_in, struct host_entry *he,
                struct in_addr *recv_addr) {
    struct iphdr *iph = (struct iphdr *) packet_in;
    struct tcphdr *tcph = (struct tcphdr *) (packet_in + sizeof(struct iphdr));
-   char ip_str[MAXLINE];	/* IP address(es) to display at start */
+   char *msg;
    char *cp;
 /*
- *	Write the IP addresses to the output string.
+ *	Set msg to the IP address of the host entry, plus the address of the
+ *	responder if different, and a tab.
  */
-   cp = ip_str;
-   cp += sprintf(cp, "%s\t", inet_ntoa(he->addr));
-   if ((he->addr).s_addr != recv_addr->s_addr)
-      cp += sprintf(cp, "(%s) ", inet_ntoa(*recv_addr));
-   *cp = '\0';
+   msg = make_message("%s\t", inet_ntoa(he->addr));
+   if ((he->addr).s_addr != recv_addr->s_addr) {
+      cp = msg;
+      msg = make_message("%s(%s) ", cp, inet_ntoa(*recv_addr));
+      free(cp);
+   }
 /*
  *	Check that the packet is large enough to decode.
  */
    if (n < sizeof(struct iphdr) + sizeof(struct tcphdr)) {
-      printf("%s%d byte packet Packet too short to decode\n", ip_str, n);
+      printf("%s%d byte packet Packet too short to decode\n", msg, n);
+      free(msg);
       return;
    }
 /*
- *	Determine type of response: SYN-ACK, RST or something else
+ *	Add TCP port to message.
  */
+   cp = msg;
+   msg = make_message("%s%u\t", cp, ntohs(tcph->source));
+   free(cp);
+/*
+ *	Determine type of response: SYN-ACK, RST or something else and
+ *	add to message.
+ */
+   cp = msg;
    if (tcph->syn && tcph->ack) {
-      printf("%sSYN-ACK (len=%d, ttl=%u)\n", ip_str, n, iph->ttl);
+      msg = make_message("%sSYN-ACK\t", cp);
    } else if (tcph->rst) {
-      printf("%sRST (len=%d, ttl=%u)\n", ip_str, n, iph->ttl);
+      msg = make_message("%sRST\t", cp);
    } else {
-      printf("%sUNKNOWN TCP PACKET (len=%d, ttl=%u)\n", ip_str, n, iph->ttl);
+      msg = make_message("%sUNKNOWN TCP PACKET\t", cp);
    }
+   free(cp);
+/*
+ *	Add TTL and packet length to the message.
+ */
+   cp = msg;
+   msg = make_message("%s(TTL=%u, IPID=%u, Length=%d)", cp,
+                      iph->ttl, iph->id, n);
+   free(cp);
+/*
+ *	Print the message.
+ */
+   printf("%s\n", msg);
+   free(msg);
 }
 
 /*
