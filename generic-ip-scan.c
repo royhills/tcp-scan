@@ -160,12 +160,12 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    iph.version = 4;
    iph.tos = 0;
    iph.tot_len = sizeof(iph) + data_len;
-   iph.id = 0;
+   iph.id = 0;		/* Linux kernel fills this in */
    iph.frag_off = 0;
    iph.ttl = 64;
    iph.protocol = ip_protocol;
-   iph.check = 0;
-   iph.saddr = 0;
+   iph.check = 0;	/* Linux kernel fills this in */
+   iph.saddr = 0;	/* Linux kernel fills this in */
    iph.daddr = he->addr.s_addr;
 /*
  *	Copy the required data into the output buffer "buf" and set "buflen"
