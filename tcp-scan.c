@@ -49,7 +49,7 @@ int ignore_dups=0;			/* Don't display duplicate packets */
 int df_flag=DEFAULT_DF;			/* IP DF Flag */
 int ip_tos=DEFAULT_TOS;			/* IP TOS Field */
 char const scanner_name[] = "tcp-scan";
-char const scanner_version[] = "1.7";
+char const scanner_version[] = "1.8";
 
 extern int verbose;	/* Verbose level */
 extern int debug;	/* Debug flag */
@@ -894,9 +894,14 @@ add_host_port(char *name, unsigned timeout, unsigned port) {
    if ((hp = gethostbyname(name)) == NULL)
       err_sys("gethostbyname failed for \"%s\"", name);
 
-   he = Malloc(sizeof(struct host_entry));
-
    num_hosts++;
+
+   if (rrlist)
+      rrlist=Realloc(rrlist, num_hosts * sizeof(struct host_entry));
+   else
+      rrlist=Malloc(sizeof(struct host_entry));
+
+   he = rrlist + (num_hosts-1); /* Would array notation be better? */
 
    Gettimeofday(&now);
 
@@ -909,17 +914,6 @@ add_host_port(char *name, unsigned timeout, unsigned port) {
    he->last_send_time.tv_sec=0;
    he->last_send_time.tv_usec=0;
    he->dport=port;
-
-   if (rrlist) {	/* List is not empty so add entry */
-      he->next = rrlist;
-      he->prev = rrlist->prev;
-      he->prev->next = he;
-      he->next->prev = he;
-   } else {		/* List is empty so initialise with this entry */
-      rrlist = he;
-      he->next = he;
-      he->prev = he;
-   }
 }
 
 /*
@@ -1065,10 +1059,15 @@ local_find_host(struct host_entry **ptr, struct host_entry *he,
    do {
       iterations++;
       if ((p->addr.s_addr == addr->s_addr) &&
-          (ntohs(tcph->source) == p->dport))
+          (ntohs(tcph->source) == p->dport)) {
          found = 1;
-      else
-         p = p->prev;
+      } else {
+         if (p == rrlist) {
+            p = rrlist + (num_hosts-1); /* Wrap round to end */
+         } else {
+            p--;
+         }
+      }
    } while (!found && p != he);
 
    if (debug) {print_times(); printf("find_host: found=%d, iterations=%u\n", found, iterations);}
@@ -1127,10 +1126,12 @@ callback(u_char *args, const struct pcap_pkthdr *header,
 /*
  *	We've received a response.  Try to match up the packet by IP address
  *
- *	Note: We start at cursor->prev because we call advance_cursor() after
- *	      each send_packet().
+ *	We should really start searching at the host before the cursor, as we
+ *	know that the host to match cannot be the one at the cursor position
+ *	because we call advance_cursor() after sending each packet.  However,
+ *	the time saved is minimal, and it's not worth the extra complexity.
  */
-   temp_cursor=find_host(cursor->prev, &source_ip, packet_in, n);
+   temp_cursor=find_host(cursor, &source_ip, packet_in, n);
    if (temp_cursor) {
 /*
  *	We found an IP match for the packet. 
