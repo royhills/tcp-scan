@@ -125,3 +125,4 @@ void initialise(void);
 void clean_up(void);
 void udp_scan_version(void);
 void local_version(void);
+void local_help(void);
