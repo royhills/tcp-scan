@@ -47,6 +47,8 @@ int quiet_flag=0;			/* Don't decode the packet */
 int ignore_dups=0;			/* Don't display duplicate packets */
 int df_flag=DEFAULT_DF;			/* IP DF Flag */
 int ip_tos=DEFAULT_TOS;			/* IP TOS Field */
+int portname_flag=0;			/* Display port names */
+char **portnames=NULL;
 char const scanner_name[] = "tcp-scan";
 char const scanner_version[] = "1.9";
 
@@ -134,7 +136,13 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
  *	Add TCP port to message.
  */
    cp = msg;
-   msg = make_message("%s%u\t", cp, ntohs(tcph->source));
+   if (portname_flag) {
+      char *portname = portnames[ntohs(tcph->source)];
+      msg = make_message("%s%u (%s)\t", cp, ntohs(tcph->source),
+                         portname?portname:"unknown");
+   } else {
+      msg = make_message("%s%u\t", cp, ntohs(tcph->source));
+   }
    free(cp);
 /*
  *	Determine type of response: SYN-ACK, RST or something else and
@@ -679,6 +687,41 @@ initialise(void) {
    free(filter_string);
    if ((pcap_setfilter(handle, &filter)) < 0)
       err_msg("pcap_setfilter: %s\n", pcap_geterr(handle));
+/*
+ *	If we are displaying portnames, then initialise portname array.
+ */
+   if (portname_flag) {
+      FILE *fp;
+      int i;
+      int n;
+      char *p;
+      char lbuf[MAXLINE];
+      char desc[256];
+      char portname[17];
+      unsigned int port;
+      char prot[4];
+
+      if ((fp = fopen(SERVICE_FILE, "r")) != NULL) {
+         portnames = Malloc(65536 * sizeof(char *));
+         for (i=0; i<65536; i++)
+            portnames[i] = NULL;
+         while (fgets(lbuf, MAXLINE, fp)) {
+            if (strchr("*# \t\n", lbuf[0]))
+                continue;
+            if (!(p = strchr (lbuf, '/')))
+                continue;
+            *p = ' ';
+            desc[0]='\0';
+            n=sscanf(lbuf, "%16s %u %3s %255[^\r\n]", portname, &port, prot,
+                     desc);
+            if (n >= 3 && !strcmp(prot, "tcp") && (port < 65536)) {
+               portnames[port] = make_message("%s", portname);
+            }
+         }
+      } else {
+         perror("Cannot open services file");
+      }
+   }
 }
 
 /*
@@ -803,6 +846,7 @@ local_help(void) {
    fprintf(stderr, "\n--tos=<n> or -O <n>\tSet IP TOS (Type of Service) to <n>. Default=%d\n", DEFAULT_TOS);
    fprintf(stderr, "\t\t\tThis sets the TOS value in the IP header for outbound\n");
    fprintf(stderr, "\t\t\tSYN packets.\n");
+   fprintf(stderr, "\n--portname or -P\tDisplay port names as well as numbers.\n");
 }
 
 /*
@@ -1230,9 +1274,10 @@ local_process_options(int argc, char *argv[]) {
       {"tos", required_argument, 0, 'O'},
       {"random", no_argument, 0, 'R'},
       {"numeric", no_argument, 0, 'N'},
+      {"portname", no_argument, 0, 'P'},
       {0, 0, 0, 0}
    };
-   const char *short_options = "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:WaTn:l:I:qgF:O:RN";
+   const char *short_options = "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:WaTn:l:I:qgF:O:RNP";
    int arg;
    int options_index=0;
 
@@ -1345,6 +1390,9 @@ local_process_options(int argc, char *argv[]) {
             break;
          case 'N':	/* --numeric */
             numeric_flag=1;
+            break;
+         case 'P':	/* --portname */
+            portname_flag=1;
             break;
          default:	/* Unknown option */
             usage();
