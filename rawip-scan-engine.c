@@ -31,12 +31,12 @@ struct host_entry *cursor;		/* Pointer to current list entry */
 unsigned num_hosts = 0;			/* Number of entries in the list */
 unsigned responders = 0;		/* Number of hosts which responded */
 unsigned live_count;			/* Number of entries awaiting reply */
-unsigned rejected;			/* Packets rejected because not ours */
 unsigned max_iter;			/* Max iterations in find_host() */
 int verbose=0;				/* Verbose level */
 int debug = 0;				/* Debug flag */
 char *local_data=NULL;			/* Local data for scanner */
 pcap_t *handle;
+int pcap_fd;				/* Pcap file descriptor */
 
 extern unsigned interval;		/* Desired interval between packets */
 extern char const scanner_name[];	/* Scanner Name */
@@ -339,7 +339,8 @@ main(int argc, char *argv[]) {
          if (debug) {print_times(); printf("main: Can't send packet yet.  loop_timediff=%llu\n", loop_timediff);}
       } /* End If */
 
-      recvfrom_wto(sockfd, packet_in, MAXIP, (struct sockaddr *)&sa_peer, select_timeout);
+      recvfrom_wto(pcap_fd, packet_in, MAXIP, (struct sockaddr *)&sa_peer,
+                   select_timeout);
    } /* End While */
 
    printf("\n");        /* Ensure we have a blank line */
@@ -360,7 +361,7 @@ main(int argc, char *argv[]) {
    printf("Ending %s: %u hosts scanned in %.3f seconds (%.2f hosts/sec).  %u responded\n",
           scanner_name, num_hosts, elapsed_seconds, num_hosts/elapsed_seconds,
           responders);
-   printf("%u packets rejected, maximum iterations=%u\n", rejected, max_iter);
+   printf("maximum iterations=%u\n", max_iter);
    if (debug) {print_times(); printf("main: End\n");}
    return 0;
 }
