@@ -869,7 +869,6 @@ local_add_host(char *name, unsigned timeout) {
          if (*cp == ',')
             cp++;  /* Move on to next entry */
       }
-      free(local_data);
    } else {	/* --servicefile option specified */
 /*
  *	Add a host entry for each port in the port list.
@@ -880,7 +879,6 @@ local_add_host(char *name, unsigned timeout) {
          add_host_port(name, timeout, pe->port);
          pe = pe->next;
       }
-      free_port_list();
    }
 
    return 1;	/* Replace generic add_host() function */
