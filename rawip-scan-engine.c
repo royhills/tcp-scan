@@ -31,6 +31,8 @@ struct host_entry *cursor;		/* Pointer to current list entry */
 unsigned num_hosts = 0;			/* Number of entries in the list */
 unsigned responders = 0;		/* Number of hosts which responded */
 unsigned live_count;			/* Number of entries awaiting reply */
+unsigned rejected;			/* Packets rejected because not ours */
+unsigned max_iter;			/* Max iterations in find_host() */
 int verbose=0;				/* Verbose level */
 int debug = 0;				/* Debug flag */
 char *local_data=NULL;			/* Local data for scanner */
@@ -396,6 +398,7 @@ main(int argc, char *argv[]) {
    printf("Ending %s: %u hosts scanned in %.3f seconds (%.2f hosts/sec).  %u responded\n",
           scanner_name, num_hosts, elapsed_seconds, num_hosts/elapsed_seconds,
           responders);
+   printf("%u packets rejected, maximum iterations=%u\n", rejected, max_iter);
    if (debug) {print_times(); printf("main: End\n");}
    return 0;
 }
