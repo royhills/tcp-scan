@@ -1,8 +1,8 @@
 dnl $Id$
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT(sql-slammer-scan, 1.2, [sql-slammer-scan@nta-monitor.com])
-AC_CONFIG_SRCDIR([sql-slammer-scan.c])
+AC_INIT(sql-slammer-scan, 1.3, [sql-slammer-scan@nta-monitor.com])
+AC_CONFIG_SRCDIR([udp-scan-engine.c])
 dnl If I don't pass $PACKAGE_NAME and $PACKAGE_VERSION to AM_INIT_AUTOMAKE,
 dnl then PACKAGE and VERSION are not defined and these are required for
 dnl make dist.  The documentation implies that I shouldn't need to
