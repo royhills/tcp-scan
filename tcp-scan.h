@@ -39,6 +39,7 @@
 #define DEFAULT_TTL 64			/* IP TTL */
 #define DEFAULT_DF 1			/* IP DF Flag */
 #define DEFAULT_TOS 0			/* IP TOS Field */
+#define SERVICE_FILE "/usr/lib/strobe.services"
 
 /* Structures */
 
