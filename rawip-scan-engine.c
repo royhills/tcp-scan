@@ -56,14 +56,13 @@ main(int argc, char *argv[]) {
       {"timeout", required_argument, 0, 't'},
       {"interval", required_argument, 0, 'i'},
       {"backoff", required_argument, 0, 'b'},
-      {"selectwait", required_argument, 0, 'w'},
       {"verbose", no_argument, 0, 'v'},
       {"version", no_argument, 0, 'V'},
       {"debug", no_argument, 0, 'd'},
       {"data", required_argument, 0, 'D'},
       {0, 0, 0, 0}
    };
-   const char *short_options = "f:hs:p:r:t:i:b:w:vVdD:";
+   const char *short_options = "f:hs:p:r:t:i:b:vVdD:";
    int arg;
    char arg_str[MAXLINE];	/* Args as string for syslog */
    int options_index=0;
@@ -138,9 +137,6 @@ main(int argc, char *argv[]) {
             break;
          case 'b':	/* --backoff */
             backoff_factor=atof(optarg);
-            break;
-         case 'w':	/* --selectwait */
-            select_timeout=atoi(optarg);
             break;
          case 'v':	/* --verbose */
             verbose++;
@@ -271,6 +267,7 @@ main(int argc, char *argv[]) {
          host_timediff = 1000*diff.tv_sec + diff.tv_usec/1000;
          if (host_timediff >= cursor->timeout) {
             if (debug) {print_times(); printf("main: Can send packet to host %d now.  host_timediff=%lu\n", cursor->n, host_timediff);}
+            select_timeout = interval;
 /*
  *	If we've exceeded our retry limit, then this host has timed out so
  *	remove it from the list.  Otherwise, increase the timeout by the
@@ -280,11 +277,10 @@ main(int argc, char *argv[]) {
             if (cursor->num_sent >= retry) {
                if (verbose)
                   warn_msg("---\tRemoving host entry %u (%s) - Timeout", cursor->n, inet_ntoa(cursor->addr));
-               remove_host(cursor);
+               remove_host(cursor);	/* Automatically calls advance_cursor() */
             } else {	/* Retry limit not reached for this host */
-               if (cursor->num_sent) {
+               if (cursor->num_sent)
                   cursor->timeout *= backoff_factor;
-               }
                send_packet(sockfd, cursor, dest_port, &last_packet_time);
                advance_cursor();
             }
@@ -293,9 +289,11 @@ main(int argc, char *argv[]) {
  *	Note that there is no point calling advance_cursor() here because if
  *	host n is not ready to send, then host n+1 will not be ready either.
  */
+            select_timeout = cursor->timeout - host_timediff;
             if (debug) {print_times(); printf("main: Can't send packet to host %d yet. host_timediff=%lu\n", cursor->n, host_timediff);}
          } /* End If */
       } else {		/* We can't send a packet yet */
+         select_timeout = interval - loop_timediff;
          if (debug) {print_times(); printf("main: Can't send packet yet.  loop_timediff=%lu\n", loop_timediff);}
       } /* End If */
 
@@ -567,24 +565,13 @@ usage(void) {
    fprintf(stderr, "\n--interval=<n> or -i <n> Set minimum packet interval to <n> ms, default=%d.\n", interval);
    fprintf(stderr, "\t\t\tThis controls the outgoing bandwidth usage by limiting\n");
    fprintf(stderr, "\t\t\tthe rate at which packets can be sent.  The packet\n");
-   fprintf(stderr, "\t\t\tinterval will be greater than or equal to this number\n");
-   fprintf(stderr, "\t\t\tand will be a multiple of the select wait specified\n");
-   fprintf(stderr, "\t\t\twith --selectwait.  Thus --interval=75 --selectwait=10\n");
-   fprintf(stderr, "\t\t\twill result in a packet interval of 80ms.\n");
+   fprintf(stderr, "\t\t\tinterval will be greater than or equal to this number.\n");
    fprintf(stderr, "\n--backoff=<b> or -b <b>\tSet timeout backoff factor to <b>, default=%.2f.\n", backoff_factor);
    fprintf(stderr, "\t\t\tThe per-host timeout is multiplied by this factor\n");
    fprintf(stderr, "\t\t\tafter each timeout.  So, if the number of retrys\n");
    fprintf(stderr, "\t\t\tis 3, the initial per-host timeout is 500ms and the\n");
    fprintf(stderr, "\t\t\tbackoff factor is 1.5, then the first timeout will be\n");
    fprintf(stderr, "\t\t\t500ms, the second 750ms and the third 1125ms.\n");
-   fprintf(stderr, "\n--selectwait=<n> or -w <n> Set select wait to <n> ms, default=%d.\n", select_timeout);
-   fprintf(stderr, "\t\t\tThis controls the timeout used in the select(2) call.\n");
-   fprintf(stderr, "\t\t\tIt defines the lower bound and granularity of the\n");
-   fprintf(stderr, "\t\t\tpacket interval set with --interval.  Smaller values\n");
-   fprintf(stderr, "\t\t\tallow more accurate and lower packet intervals;\n");
-   fprintf(stderr, "\t\t\tlarger values reduce CPU usage.  You don't need\n");
-   fprintf(stderr, "\t\t\tto change this unless you want to reduce the packet\n");
-   fprintf(stderr, "\t\t\tinterval close to or below the default selectwait time.\n");
    fprintf(stderr, "\n--verbose or -v\t\tDisplay verbose progress messages.\n");
    fprintf(stderr, "\t\t\tUse more than once for greater effect:\n");
    fprintf(stderr, "\t\t\t1 - Show when hosts are removed from the list and\n");
