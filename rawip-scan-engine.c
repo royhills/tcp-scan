@@ -37,7 +37,6 @@ char local_data[MAXLINE];		/* Local data for scanner */
 
 extern int dest_port;			/* UDP destination port */
 extern unsigned interval;		/* Interval between packets */
-extern unsigned select_timeout;		/* Select timeout */
 extern char const scanner_name[];	/* Scanner Name */
 extern char const scanner_version[];	/* Scanner Version */
 extern unsigned retry;			/* Number of retries */
@@ -78,6 +77,7 @@ main(int argc, char *argv[]) {
    struct host_entry *temp_cursor;
    struct hostent *hp;
    struct timeval diff;		/* Difference between two timevals */
+   unsigned select_timeout;	/* Select timeout */
    unsigned long loop_timediff;	/* Time since last packet sent in ms */
    unsigned long host_timediff; /* Time since last packet sent to this host */
    int arg_str_space;		/* Used to avoid buffer overruns when copying */
