@@ -42,7 +42,7 @@ int wscale_flag=0;			/* Add wscale=0 TCP option? */
 int sack_flag=0;			/* Add SACKOK TCP option? */
 int timestamp_flag=0;			/* Add TIMESTAMP TCP option? */
 char const scanner_name[] = "tcp-scan";
-char const scanner_version[] = "1.5";
+char const scanner_version[] = "1.6";
 
 extern int verbose;	/* Verbose level */
 extern int debug;	/* Debug flag */
@@ -388,7 +388,7 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
  */
    if (!he->live) {
       cp = msg;
-      msg = make_message("%s (DUP!)", cp);
+      msg = make_message("%s (DUP: %u)", cp, he->num_recv);
       free(cp);
    }
 /*
@@ -1119,10 +1119,11 @@ callback(u_char *args, const struct pcap_pkthdr *header,
  */
       if (verbose > 1)
          warn_msg("---\tReceived packet #%u from %s",temp_cursor->num_recv ,inet_ntoa(source_ip));
- /*
-  *	Display the packet and increment the number of responders if we are
-  *	counting all packets (open_only == 0) or if SYN and ACK are set.
-  */
+/*
+ *	Display the packet and increment the number of responders if we are
+ *	counting all packets (open_only == 0) or if SYN and ACK are set.
+ */
+      temp_cursor->num_recv++;
       if (!open_only || (tcph->syn && tcph->ack)) {
          display_packet(n, packet_in, temp_cursor, &source_ip);
          responders++;
