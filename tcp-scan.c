@@ -1,5 +1,5 @@
 /*
- * The TCP Scanner (tcp-scan) is Copyright (C) 2003 Roy Hills,
+ * The TCP Scanner (tcp-scan) is Copyright (C) 2003-2004 Roy Hills,
  * NTA Monitor Ltd.
  *
  * $Id$
@@ -33,7 +33,7 @@ float backoff_factor = DEFAULT_BACKOFF_FACTOR;	/* Backoff factor */
 uint32_t seq_no;			/* Initial TCP sequence number */
 uint16_t source_port;			/* TCP Source Port */
 char const scanner_name[] = "tcp-scan";
-char const scanner_version[] = "1.0";
+char const scanner_version[] = "1.1";
 
 extern int verbose;	/* Verbose level */
 extern int debug;	/* Debug flag */
@@ -64,7 +64,7 @@ void
 display_packet(int n, unsigned char *packet_in, struct host_entry *he,
                struct in_addr *recv_addr) {
    struct iphdr *iph = (struct iphdr *) packet_in;
-   struct tcphdr *tcph = (struct tcphdr *) (packet_in + sizeof(struct iphdr));
+   struct tcphdr *tcph;
    char *msg;
    char *cp;
    char *flags;
@@ -86,6 +86,12 @@ display_packet(int n, unsigned char *packet_in, struct host_entry *he,
       free(msg);
       return;
    }
+/*
+ *	Set tcph to start of TCP header.
+ *	Note that iph.ihl is in 32-bit units.  We multiply by 4 to get bytes.
+ *	iph.lhl is normally 5, but can be larger if IP options are present.
+ */
+   tcph = (struct tcphdr *) (packet_in + 4*(iph->ihl));
 /*
  *	Add TCP port to message.
  */
@@ -166,8 +172,8 @@ display_packet(int n, unsigned char *packet_in, struct host_entry *he,
    if (!flags)
       flags=make_message("");	/* Ensure flags not null if no TCP flags set */
    cp = msg;
-   msg = make_message("%sTTL=%u Flags=%s IPID=%u Length=%d",
-                      cp, iph->ttl, flags, iph->id, n);
+   msg = make_message("%sflags=%s win=%u ttl=%u id=%u len=%d",
+                      cp, flags, tcph->window, iph->ttl, iph->id, n);
    free(cp);
    free(flags);
 /*
@@ -219,7 +225,7 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    struct pseudo_hdr *pseudo = (struct pseudo_hdr *) (buf + sizeof(struct ip) -
    sizeof(struct pseudo_hdr));
 /*
- *	Initialise static packet data.
+ *	Determine source IP address.
  *	We can't do this in initialise() because local_data is not available
  *	in that function.
  */
@@ -434,19 +440,65 @@ local_help(void) {
  */
 int
 local_add_host(char *name, unsigned timeout) {
+   static int first_time_through=1;
+   static char *port_spec;	/* TCP port specification */
+   char *cp;
+
+   if (first_time_through) {
+      char *p1;
+      char *p2;
+
+      if (local_data == NULL)
+         err_msg("You must specify the TCP dest port with the --data option.");
+/*
+ *	Copy local_data to port_spec, omitting all whitespace.
+ */
+      port_spec = Malloc(strlen(local_data) + 1);
+      p1 = local_data;
+      p2 = port_spec;
+      while (*p1 != '\0') {
+         if (!isspace(*p1))
+            *p2++=*p1;
+         p1++;
+      }
+      *p2 = '\0';
+      first_time_through=0;
+   }
+/*
+ *	Determine the ports in the port spec, and add a host entry for
+ *	each one.
+ */
+   cp = port_spec;
+   while (*cp != '\0') {
+      unsigned port1;
+      unsigned port2;
+      unsigned i;
+
+      port1=strtoul(cp, &cp, 10);
+      if (*cp == ',' || *cp == '\0') {	/* Single port specification */
+         add_host_port(name, timeout, port1);
+      } else if (*cp == '-') {		/* Inclusive range */
+         cp++;
+         port2=strtoul(cp, &cp, 10);
+         for (i=port1; i<=port2; i++)
+            add_host_port(name, timeout, i);
+      } else {
+         printf("unknown port spec\n");
+         return 1;
+      }
+      if (*cp == ',')
+         cp++;  /* Move on to next entry */
+   }
+
+   return 1;	/* Replace generic add_host() function */
+}
+
+void
+add_host_port(char *name, unsigned timeout, unsigned port) {
    struct hostent *hp;
    struct host_entry *he;
    struct timeval now;
    struct tcp_data *tdp;
-   static int first_time_through=1;
-   static int tcp_port;		/* TCP destination port */
-
-   if (first_time_through) {
-      if (local_data == NULL)
-         err_msg("You must specify the TCP dest port with the --data option.");
-      tcp_port = atoi(local_data);
-      first_time_through=0;
-   }
 
    if ((hp = gethostbyname(name)) == NULL)
       err_sys("gethostbyname");
@@ -457,7 +509,7 @@ local_add_host(char *name, unsigned timeout) {
    if ((tdp = malloc(sizeof(struct tcp_data))) == NULL)
       err_sys("malloc");
 
-   tdp->dport=tcp_port;
+   tdp->dport=port;
 
    num_hosts++;
 
@@ -483,7 +535,6 @@ local_add_host(char *name, unsigned timeout) {
       he->next = he;
       he->prev = he;
    }
-   return 1;	/* Replace generic add_host() function */
 }
 
 /*
@@ -595,7 +646,7 @@ int
 local_find_host(struct host_entry **ptr, struct host_entry *he,
                 struct in_addr *addr, unsigned char *packet_in, int n) {
    struct iphdr *iph = (struct iphdr *) packet_in;
-   struct tcphdr *tcph = (struct tcphdr *) (packet_in + sizeof(struct iphdr));
+   struct tcphdr *tcph;
    struct host_entry *p;
    int found = 0;
    struct tcp_data *tdp;
@@ -607,6 +658,12 @@ local_find_host(struct host_entry **ptr, struct host_entry *he,
       *ptr = NULL;
       return 1;
    }
+/*
+ *	Set tcph to start of TCP header.
+ *	Note that iph.ihl is in 32-bit units.  We multiply by 4 to get bytes.
+ *	iph.lhl is normally 5, but can be larger if IP options are present.
+ */
+   tcph = (struct tcphdr *) (packet_in + 4*(iph->ihl));
 /*
  *	Don't try to match if it's not a response to one of our packets.
  */
@@ -623,7 +680,9 @@ local_find_host(struct host_entry **ptr, struct host_entry *he,
       *ptr = NULL;
       return 1;
    }
-
+/*
+ *	It looks like a valid response, so try to match against out host list.
+ */
    p = he;
    do {
       iterations++;
