@@ -432,7 +432,6 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    char buf[MAXIP];
    int buflen;
    NET_SIZE_T sa_peer_len;
-   struct tcp_data *tdp;
    struct iphdr *iph = (struct iphdr *) buf;
    struct tcphdr *tcph = (struct tcphdr *) (buf + sizeof(struct iphdr));
    struct pseudo_hdr {	/* For computing TCP checksum */
@@ -531,10 +530,9 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
 /*
  *	Construct the TCP header.
  */
-   tdp = (struct tcp_data *) he->local_host_data;
    memset(tcph, '\0', sizeof(struct tcphdr));
    tcph->source = htons(source_port);
-   tcph->dest = htons(tdp->dport);
+   tcph->dest = htons(he->dport);
    tcph->seq = htonl(seq_no);
    tcph->doff = (sizeof(struct tcphdr) + options_len) / 4;
    tcph->syn = 1;
@@ -909,7 +907,6 @@ add_host_port(char *name, unsigned timeout, unsigned port) {
    struct hostent *hp;
    struct host_entry *he;
    struct timeval now;
-   struct tcp_data *tdp;
 
    if (port < 1 || port > 65535)
       err_msg("Invalid port number: %u.  Port must be in range 1-65535", port);
@@ -919,11 +916,6 @@ add_host_port(char *name, unsigned timeout, unsigned port) {
 
    if ((he = malloc(sizeof(struct host_entry))) == NULL)
       err_sys("malloc");
-
-   if ((tdp = malloc(sizeof(struct tcp_data))) == NULL)
-      err_sys("malloc");
-
-   tdp->dport=port;
 
    num_hosts++;
 
@@ -937,7 +929,7 @@ add_host_port(char *name, unsigned timeout, unsigned port) {
    he->num_recv = 0;
    he->last_send_time.tv_sec=0;
    he->last_send_time.tv_usec=0;
-   he->local_host_data = tdp;
+   he->dport=port;
 
    if (rrlist) {	/* List is not empty so add entry */
       he->next = rrlist;
@@ -1063,7 +1055,6 @@ local_find_host(struct host_entry **ptr, struct host_entry *he,
    struct tcphdr *tcph;
    struct host_entry *p;
    int found = 0;
-   struct tcp_data *tdp;
    unsigned iterations = 0;     /* Used for debugging */
 /*
  *      Don't try to match if packet is too short.
@@ -1094,9 +1085,8 @@ local_find_host(struct host_entry **ptr, struct host_entry *he,
    p = he;
    do {
       iterations++;
-      tdp = (struct tcp_data *) p->local_host_data;
       if ((p->addr.s_addr == addr->s_addr) &&
-          (ntohs(tcph->source) == tdp->dport))
+          (ntohs(tcph->source) == p->dport))
          found = 1;
       else
          p = p->prev;
