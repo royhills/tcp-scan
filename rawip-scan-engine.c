@@ -593,9 +593,8 @@ usage(void) {
    fprintf(stderr, "\t\t\t3 - Display the host list before\n");
    fprintf(stderr, "\t\t\t    scanning starts.\n");
    fprintf(stderr, "\n--version or -V\t\tDisplay program version and exit.\n");
-   fprintf(stderr, "\n--data=<d> or -D <d>\tSpecify protocol-specific data.\n");
-   fprintf(stderr, "\t\t\tThe meaning of the data varies depending on the protocol\n");
-   fprintf(stderr, "\t\t\tbeing scanned.\n");
+/* Call scanner-specific help function */
+   local_help();
    fprintf(stderr, "\n");
    fprintf(stderr, "Report bugs or send suggestions to %s\n", PACKAGE_BUGREPORT);
    exit(1);
