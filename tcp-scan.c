@@ -49,7 +49,7 @@ int ignore_dups=0;			/* Don't display duplicate packets */
 int df_flag=DEFAULT_DF;			/* IP DF Flag */
 int ip_tos=DEFAULT_TOS;			/* IP TOS Field */
 char const scanner_name[] = "tcp-scan";
-char const scanner_version[] = "1.6";
+char const scanner_version[] = "1.7";
 
 extern int verbose;	/* Verbose level */
 extern int debug;	/* Debug flag */
