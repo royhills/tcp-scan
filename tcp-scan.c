@@ -66,7 +66,7 @@ extern int filename_flag;
 static uint32_t source_address;
 extern int pcap_fd;			/* pcap File Descriptor */
 static size_t ip_offset;		/* Offset to IP header in pcap pkt */
-static struct port_entry *port_list=NULL;
+static uint16_t *port_list=NULL;
 
 /*
  *	display_packet -- Check and display received packet
@@ -873,12 +873,10 @@ local_add_host(char *name, unsigned timeout) {
 /*
  *	Add a host entry for each port in the port list.
  */
-      struct port_entry *pe=port_list;
+      int i=0;
 
-      while (pe) {
-         add_host_port(name, timeout, pe->port);
-         pe = pe->next;
-      }
+      while (port_list[i])
+         add_host_port(name, timeout, port_list[i++]);
    }
 
    return 1;	/* Replace generic add_host() function */
@@ -1345,77 +1343,61 @@ local_process_options(int argc, char *argv[]) {
  *	None.
  *
  *	This function creates the TCP port list from the specified services
- *	file.
+ *	file.  It uses the same code as strobe for this so that the service
+ *	file formats are compatible.  However, it is fussier than strobe
+ *	regarding invalid names and port numbers.
  */
 void
 create_port_list(char *filename) {
-    FILE *fh;
-    char lbuf[1024];
-    char desc[256];
-    char portname[17];
-    unsigned int port;
-    char prot[4];
-    struct port_entry *pe;
+   FILE *fh;
+   char lbuf[1024];
+   char desc[256];
+   char portname[17];
+   unsigned int port;
+   char prot[4];
+   int nports=0;
 
-    prot[3]='\0';
-    if (!(fh = fopen (filename, "r")))
+   if (port_list)
+      err_msg("Service file has already been specified");
+
+   prot[3]='\0';
+   if (!(fh = fopen (filename, "r")))
       err_sys("fopen %s", filename);
 
-    while (fgets (lbuf, sizeof (lbuf), fh))
-    {
-	char *p;
-        int n;
+   while (fgets (lbuf, sizeof (lbuf), fh)) {
+      char *p;
+      int n;
 
-	if (strchr("*# \t\n", lbuf[0]))
-            continue;
-	if (!(p = strchr (lbuf, '/')))
-            continue;
-	*p = ' ';
-	desc[0]='\0';
-	n=sscanf(lbuf, "%16s %u %3s %255[^\r\n]", portname, &port, prot, desc);
-        if (n < 3) {
-           warn_msg("Ignoring invalid entry: %s", lbuf);
-	   continue;
-        }
-        if (strcmp (prot, "tcp")) {
-           warn_msg("Ignoring non-TCP entry: %s", lbuf);
-	   continue;
-        }
-        if (port < 1 || port > 65535)
-           err_msg("Invalid port number: %u.  Port must be in range 1-65535",
-                   port);
-        pe=Malloc(sizeof(struct port_entry));
-        pe->port = port;
-        pe->next = port_list;
-        port_list = pe;
-    }
-}
-
-/*
- *	free_port_list	-- Delete TCP port list
- *
- *	Inputs:
- *
- *	None.
- *
- *	Outputs:
- *
- *	None.
- *
- *	This function deletes the TCP port list that was previously created
- *	with create_port_list() and frees the associated memory.
- */
-void
-free_port_list(void) {
-   struct port_entry *temp;
-   struct port_entry *p;
-
-   p = port_list;
-
-   while (p) {
-      temp = p->next;
-      free(p);
-      p = temp;
+      if (strchr("*# \t\n", lbuf[0]))
+          continue;
+      if (!(p = strchr (lbuf, '/')))
+          continue;
+      *p = ' ';
+      desc[0]='\0';
+      n=sscanf(lbuf, "%16s %u %3s %255[^\r\n]", portname, &port, prot, desc);
+      if (n < 3) {
+         warn_msg("Ignoring invalid entry: %s", lbuf);
+         continue;
+      }
+      if (strcmp (prot, "tcp")) {
+         warn_msg("Ignoring non-TCP entry: %s", lbuf);
+         continue;
+      }
+      if (port < 1 || port > 65535)
+         err_msg("Invalid port number: %u.  Port must be in range 1-65535",
+                 port);
+      nports++;
+      if (port_list) {
+         port_list=Realloc(port_list, nports * sizeof(uint16_t));
+      } else {
+         port_list=Malloc(sizeof(uint16_t));
+      }
+      port_list[nports-1] = port;
    }
+   if (port_list) {
+      port_list=Realloc(port_list, (nports+1) * sizeof(uint16_t));
+   } else {
+      port_list=Malloc(sizeof(uint16_t));
+   }
+   port_list[nports] = 0;	/* Mark end of list with zero */
 }
-
