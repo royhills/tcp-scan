@@ -36,7 +36,7 @@ int debug = 0;				/* Debug flag */
 char *local_data;			/* Local data for scanner */
 
 extern int dest_port;			/* UDP destination port */
-extern unsigned interval;		/* Interval between packets */
+extern unsigned interval;		/* Desired interval between packets */
 extern char const scanner_name[];	/* Scanner Name */
 extern char const scanner_version[];	/* Scanner Version */
 extern unsigned retry;			/* Number of retries */
@@ -82,6 +82,13 @@ main(int argc, char *argv[]) {
    unsigned long host_timediff; /* Time since last packet sent to this host */
    int arg_str_space;		/* Used to avoid buffer overruns when copying */
    struct timeval last_packet_time;	/* Time last packet was sent */
+   int req_interval;		/* Requested per-packet interval */
+   int cum_err;			/* Cumulative timing error */
+   struct timeval start_time;	/* Program start time */
+   struct timeval end_time;	/* Program end time */
+   struct timeval elapsed_time;	/* Elapsed time as timeval */
+   double elapsed_seconds;	/* Elapsed time in seconds */
+   static int reset_cum_err;
 /*
  *	Open syslog channel and log arguments if required.
  *	We must be careful here to avoid overflowing the arg_str buffer
@@ -104,6 +111,11 @@ main(int argc, char *argv[]) {
    }
    info_syslog("Starting: %s", arg_str);
 #endif
+/*
+ *	Get program start time for statistics displayed on completion.
+ */
+   if ((gettimeofday(&start_time, NULL)) != 0)
+      err_sys("gettimeofday");
 /*
  *	Call protocol-specific initialisation routine to perform any
  *	initial setup required.
@@ -244,23 +256,24 @@ main(int argc, char *argv[]) {
  *
  *	The loop exits when all hosts have either responded or timed out.
  */
+   reset_cum_err = 1;
+   req_interval = interval;
    while (live_count) {
-      if (debug) {print_times(); printf("main: Top of loop\n");}
+      if (debug) {print_times(); printf("main: Top of loop.\n");}
 /*
  *	Obtain current time and calculate deltas since last packet and
  *	last packet to this host.
  */
-      if ((gettimeofday(&now, NULL)) != 0) {
+      if ((gettimeofday(&now, NULL)) != 0)
          err_sys("gettimeofday");
-      }
 /*
  *	If the last packet was sent more than interval ms ago, then we can
  *	potentially send a packet to the current host.
  */
       timeval_diff(&now, &last_packet_time, &diff);
       loop_timediff = 1000*diff.tv_sec + diff.tv_usec/1000;
-      if (loop_timediff >= interval) {
-         if (debug) {print_times(); printf("main: Can send packet now.  loop_timediff=%lu\n", loop_timediff);}
+      if (loop_timediff >= req_interval) {
+         if (debug) {print_times(); printf("main: Can send packet now.  loop_timediff=%lu, req_interval=%d, cum_err=%d\n", loop_timediff, req_interval, cum_err);}
 /*
  *	If the last packet to this host was sent more than the current
  *	timeout for this host ms ago, then we can potentially send a packet
@@ -269,8 +282,21 @@ main(int argc, char *argv[]) {
          timeval_diff(&now, &(cursor->last_send_time), &diff);
          host_timediff = 1000*diff.tv_sec + diff.tv_usec/1000;
          if (host_timediff >= cursor->timeout) {
-            if (debug) {print_times(); printf("main: Can send packet to host %d now.  host_timediff=%lu\n", cursor->n, host_timediff);}
-            select_timeout = interval;
+            if (reset_cum_err) {
+               if (debug) {print_times(); printf("main: Reset cum_err\n");}
+               cum_err = 0;
+               req_interval = interval;
+               reset_cum_err = 0;
+            } else {
+               cum_err += loop_timediff - interval;
+               if (req_interval >= cum_err) {
+                  req_interval = req_interval - cum_err;
+               } else {
+                  req_interval = 0;
+               }
+            }
+            if (debug) {print_times(); printf("main: Can send packet to host %d now.  host_timediff=%lu, timeout=%u\n", cursor->n, host_timediff, cursor->timeout);}
+            select_timeout = req_interval;
 /*
  *	If we've exceeded our retry limit, then this host has timed out so
  *	remove it from the list.  Otherwise, increase the timeout by the
@@ -280,7 +306,10 @@ main(int argc, char *argv[]) {
             if (cursor->num_sent >= retry) {
                if (verbose)
                   warn_msg("---\tRemoving host entry %u (%s) - Timeout", cursor->n, inet_ntoa(cursor->addr));
+               if (debug) {print_times(); printf("main: Timing out host %d.\n", cursor->n);}
                remove_host(cursor);	/* Automatically calls advance_cursor() */
+               if ((gettimeofday(&last_packet_time, NULL)) != 0)
+                  err_sys("gettimeofday");
             } else {	/* Retry limit not reached for this host */
                if (cursor->num_sent)
                   cursor->timeout *= backoff_factor;
@@ -293,10 +322,11 @@ main(int argc, char *argv[]) {
  *	host n is not ready to send, then host n+1 will not be ready either.
  */
             select_timeout = cursor->timeout - host_timediff;
+            reset_cum_err = 1;	/* Zero cumulative error */
             if (debug) {print_times(); printf("main: Can't send packet to host %d yet. host_timediff=%lu\n", cursor->n, host_timediff);}
          } /* End If */
       } else {		/* We can't send a packet yet */
-         select_timeout = interval - loop_timediff;
+         select_timeout = req_interval - loop_timediff;
          if (debug) {print_times(); printf("main: Can't send packet yet.  loop_timediff=%lu\n", loop_timediff);}
       } /* End If */
 
@@ -338,11 +368,20 @@ main(int argc, char *argv[]) {
 
    close(sockfd);
    clean_up();
+
+   if ((gettimeofday(&end_time, NULL)) != 0)
+      err_sys("gettimeofday");
+   timeval_diff(&end_time, &start_time, &elapsed_time);
+   elapsed_seconds = (elapsed_time.tv_sec*1000 +
+                      elapsed_time.tv_usec/1000) / 1000.0;
+
 #ifdef SYSLOG
-   info_syslog("Ending: %u hosts scanned. %u responded", num_hosts, responders);
+   info_syslog("Ending: %u hosts scanned in %.3f seconds. %u responded",
+               num_hosts, elapsed_seconds, responders);
 #endif
-   printf("Ending %s %s (%s): %u hosts scanned.  %u responded\n", scanner_name,
-          scanner_version, PACKAGE_STRING, num_hosts, responders);
+   printf("Ending %s %s (%s): %u hosts scanned in %.3f seconds.  %u responded\n",
+          scanner_name, scanner_version, PACKAGE_STRING, num_hosts,
+          elapsed_seconds, responders);
    if (debug) {print_times(); printf("main: End\n");}
    return(0);
 }
