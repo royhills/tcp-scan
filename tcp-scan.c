@@ -67,6 +67,7 @@ display_packet(int n, unsigned char *packet_in, struct host_entry *he,
    struct tcphdr *tcph = (struct tcphdr *) (packet_in + sizeof(struct iphdr));
    char *msg;
    char *cp;
+   char *flags;
 /*
  *	Set msg to the IP address of the host entry, plus the address of the
  *	responder if different, and a tab.
@@ -81,7 +82,7 @@ display_packet(int n, unsigned char *packet_in, struct host_entry *he,
  *	Check that the packet is large enough to decode.
  */
    if (n < sizeof(struct iphdr) + sizeof(struct tcphdr)) {
-      printf("%s%d byte packet Packet too short to decode\n", msg, n);
+      printf("%s%d byte packet too short to decode\n", msg, n);
       free(msg);
       return;
    }
@@ -96,21 +97,79 @@ display_packet(int n, unsigned char *packet_in, struct host_entry *he,
  *	add to message.
  */
    cp = msg;
-   if (tcph->syn && tcph->ack) {
-      msg = make_message("%sSYN-ACK\t", cp);
-   } else if (tcph->rst) {
-      msg = make_message("%sRST\t", cp);
-   } else {
-      msg = make_message("%sUNKNOWN TCP PACKET\t", cp);
+   if (tcph->syn && tcph->ack) {	/* SYN + ACK = Open */
+      msg = make_message("%sOPEN\t", cp);
+   } else if (tcph->rst) {		/* RST = Closed */
+      msg = make_message("%sCLOSED\t", cp);
+   } else {				/* Shouldn't happen */
+      msg = make_message("%sUNKNOWN\t", cp);
    }
    free(cp);
 /*
- *	Add TTL and packet length to the message.
+ *	Add TCP Flags, TTL, IPIP, and IP packet length to the message.
  */
+   flags = NULL;
+   if (tcph->urg) {
+      if (flags) {
+         cp = flags;
+         flags = make_message("%s,URG", cp);
+         free(cp);
+      } else {
+         flags = make_message("URG");
+      }
+   }
+   if (tcph->ack) {
+      if (flags) {
+         cp = flags;
+         flags = make_message("%s,ACK", cp);
+         free(cp);
+      } else {
+         flags = make_message("ACK");
+      }
+   }
+   if (tcph->psh) {
+      if (flags) {
+         cp = flags;
+         flags = make_message("%s,PSH", cp);
+         free(cp);
+      } else {
+         flags = make_message("PSH");
+      }
+   }
+   if (tcph->rst) {
+      if (flags) {
+         cp = flags;
+         flags = make_message("%s,RST", cp);
+         free(cp);
+      } else {
+         flags = make_message("RST");
+      }
+   }
+   if (tcph->syn) {
+      if (flags) {
+         cp = flags;
+         flags = make_message("%s,SYN", cp);
+         free(cp);
+      } else {
+         flags = make_message("SYN");
+      }
+   }
+   if (tcph->fin) {
+      if (flags) {
+         cp = flags;
+         flags = make_message("%s,FIN", cp);
+         free(cp);
+      } else {
+         flags = make_message("FIN");
+      }
+   }
+   if (!flags)
+      flags=make_message("");	/* Ensure flags not null if no TCP flags set */
    cp = msg;
-   msg = make_message("%s(TTL=%u, IPID=%u, Length=%d)", cp,
-                      iph->ttl, iph->id, n);
+   msg = make_message("%sTTL=%u Flags=%s IPID=%u Length=%d",
+                      cp, iph->ttl, flags, iph->id, n);
    free(cp);
+   free(flags);
 /*
  *	Print the message.
  */
