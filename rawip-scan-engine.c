@@ -318,10 +318,14 @@ main(int argc, char *argv[]) {
                if (first_timeout) {
                   timeval_diff(&now, &(cursor->last_send_time), &diff);
                   host_timediff = 1000000*diff.tv_sec + diff.tv_usec;
-                  while (host_timediff >= cursor->timeout) {
-                     if (verbose > 1)
-                        warn_msg("---\tRemoving host %u (%s) - Catch-Up Timeout", cursor->n, inet_ntoa(cursor->addr));
-                     remove_host(cursor);
+                  while (host_timediff >= cursor->timeout && live_count) {
+                     if (cursor->live) {
+                        if (verbose > 1)
+                           warn_msg("---\tRemoving host %u (%s) - Catch-Up Timeout", cursor->n, inet_ntoa(cursor->addr));
+                        remove_host(cursor);
+                     } else {
+                        advance_cursor();
+                     }
                      timeval_diff(&now, &(cursor->last_send_time), &diff);
                      host_timediff = 1000000*diff.tv_sec + diff.tv_usec;
                   }
