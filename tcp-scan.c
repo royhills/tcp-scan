@@ -54,7 +54,10 @@ static size_t ip_offset;		/* Offset to IP header in pcap pkt */
  *
  *	Inputs:
  *
- *	n		The length of the received packet in bytes
+ *	n		The length of the received packet in bytes.
+ *			Note that this can be more or less than the IP packet
+ *			size because of minimum frame sizes or snaplength
+ *			cutoff respectively.
  *	packet_in	The received packet
  *	he		The host entry corresponding to the received packet
  *	recv_addr	IP address that the packet was received from
@@ -74,6 +77,8 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
    char *msg;
    char *cp;
    char *flags;
+   int data_len;
+   unsigned data_offset;
 /*
  *	Set msg to the IP address of the host entry, plus the address of the
  *	responder if different, and a tab.
@@ -180,11 +185,32 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
    if (!flags)
       flags=make_message("");	/* Ensure flags not null if no TCP flags set */
    cp = msg;
-   msg = make_message("%sflags=%s win=%u ttl=%u id=%u len=%d",
+   msg = make_message("%sflags=%s win=%u ttl=%u id=%u ip_len=%d",
                       cp, flags, tcph->window, iph->ttl, iph->id,
                       ntohs(iph->tot_len));
    free(cp);
    free(flags);
+/*
+ *	Determine length of TCP data.  If this is non-zero, then display the
+ *	data.
+ */
+   data_len = ntohs(iph->tot_len) - 4*(iph->ihl) - 4*(tcph->doff);
+   data_offset = ip_offset + 4*(iph->ihl) + 4*(tcph->doff);
+   if (data_len > 0) {
+      char *data_str;
+
+      cp = msg;
+      if (n >= data_offset + data_len) {
+         data_str=printable(packet_in+data_offset, data_len);
+         msg = make_message("%s data_len=%d data=\"%s\"", cp, data_len,
+                            data_str);
+         free(data_str);
+      } else {
+         msg = make_message("%s data_len=%d data=(packet too short to decode)",
+                            cp, data_len);
+      }
+      free(cp);
+   }
 /*
  *	Print the message.
  */
