@@ -169,6 +169,29 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
                                ntohs(icmph->un.echo.sequence));
             free(cp);
             break;
+         case 14:
+            cp = msg;
+            msg = make_message("%s icmp_id=%u, icmp_seq=%u, timestamp=%u",
+                               cp, ntohs(icmph->un.timestamp.id),
+                               ntohs(icmph->un.timestamp.sequence),
+                               ntohl(icmph->un.timestamp.transmit));
+            free(cp);
+            break;
+         case 18:
+            cp = msg;
+            msg = make_message("%s icmp_id=%u, icmp_seq=%u, mask=%u",
+                               cp, ntohs(icmph->un.mask.id),
+                               ntohs(icmph->un.mask.sequence),
+                               ntohl(icmph->un.mask.mask));
+            free(cp);
+            break;
+         case 16:
+            cp = msg;
+            msg = make_message("%s icmp_id=%u, icmp_seq=%u",
+                               cp, ntohs(icmph->un.info.id),
+                               ntohs(icmph->un.info.sequence));
+            free(cp);
+            break;
       }
 /*
  *	If the host entry is not live, then flag this as a duplicate.
@@ -238,10 +261,45 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
  *	Construct the ICMP header.
  */
    memset(icmph, '\0', sizeof(struct icmphdr));
-   icmph->type = 8;
-   icmph->code = 0;
-   icmph->un.echo.id = htons(icmp_id_no);
-   icmph->un.echo.sequence = htons(icmp_seq_no);
+   switch (icmp_packet_type) {
+      struct timeval tvorig;
+      unsigned long tsorig;
+
+      case 8:
+         icmph->type = 8;
+         icmph->code = 0;
+         icmph->un.echo.id = htons(icmp_id_no);
+         icmph->un.echo.sequence = htons(icmp_seq_no);
+         break;
+      case 13:
+         icmph->type = 13;
+         icmph->code = 0;
+         icmph->un.timestamp.id = htons(icmp_id_no);
+         icmph->un.timestamp.sequence = htons(icmp_seq_no);
+/*
+ * fill in originate timestamp: have to convert tv_sec from seconds since
+ * the Epoch to milliseconds since midnight, then add in microseconds
+ */
+         Gettimeofday(&tvorig);
+         tsorig = (tvorig.tv_sec % (24*60*60)) * 1000 + tvorig.tv_usec / 1000;
+         icmph->un.timestamp.originate = htonl(tsorig);
+         icmph->un.timestamp.receive = 0;
+         icmph->un.timestamp.originate = 0;
+         break;
+      case 17:
+         icmph->type = 17;
+         icmph->code = 0;
+         icmph->un.mask.id = htons(icmp_id_no);
+         icmph->un.mask.sequence = htons(icmp_seq_no);
+         icmph->un.mask.mask = 0;
+         break;
+      case 15:
+         icmph->type = 15;
+         icmph->code = 0;
+         icmph->un.info.id = htons(icmp_id_no);
+         icmph->un.info.sequence = htons(icmp_seq_no);
+         break;
+   }
    icmph->checksum = in_cksum((uint16_t *)icmph, sizeof(struct icmphdr));
 /*
  *	Construct the IP Header.
@@ -377,6 +435,33 @@ initialise(void) {
          warn_msg("pcap filter string: %s", filter_string);
          free(filter_string);
          break;
+      case 13:
+         filter_string=make_message("icmp[0:1]=14 and dst host %s and icmp[4:2]=%u and icmp[6:2]=%u",
+                                    my_ntoa(local_address), icmp_id_no,
+                                    icmp_seq_no);
+         if ((pcap_compile(handle,&filter,filter_string,OPTIMISE,netmask)) < 0)
+            err_msg("pcap_geterr: %s\n", pcap_geterr(handle));
+         warn_msg("pcap filter string: %s", filter_string);
+         free(filter_string);
+         break;
+      case 17:
+         filter_string=make_message("icmp[0:1]=18 and dst host %s and icmp[4:2]=%u and icmp[6:2]=%u",
+                                    my_ntoa(local_address), icmp_id_no,
+                                    icmp_seq_no);
+         if ((pcap_compile(handle,&filter,filter_string,OPTIMISE,netmask)) < 0)
+            err_msg("pcap_geterr: %s\n", pcap_geterr(handle));
+         warn_msg("pcap filter string: %s", filter_string);
+         free(filter_string);
+         break;
+      case 15:
+         filter_string=make_message("icmp[0:1]=16 and dst host %s and icmp[4:2]=%u and icmp[6:2]=%u",
+                                    my_ntoa(local_address), icmp_id_no,
+                                    icmp_seq_no);
+         if ((pcap_compile(handle,&filter,filter_string,OPTIMISE,netmask)) < 0)
+            err_msg("pcap_geterr: %s\n", pcap_geterr(handle));
+         warn_msg("pcap filter string: %s", filter_string);
+         free(filter_string);
+         break;
    }
    if ((pcap_setfilter(handle, &filter)) < 0)
       err_msg("pcap_setfilter: %s\n", pcap_geterr(handle));
@@ -473,6 +558,7 @@ local_help(void) {
    fprintf(stderr, "\n--tos=<n> or -O <n>\tSet IP TOS (Type of Service) to <n>. Default=%d\n", DEFAULT_TOS);
    fprintf(stderr, "\t\t\tThis sets the TOS value in the IP header for outbound\n");
    fprintf(stderr, "\t\t\tpackets.\n");
+   fprintf(stderr, "\n--icmptype=<n> or -T <n> Set ICMP type to <n>. Default=%d\n", DEFAULT_ICMP_TYPE);
 }
 
 /*
@@ -843,10 +929,11 @@ local_process_options(int argc, char *argv[]) {
       {"random", no_argument, 0, 'R'},
       {"numeric", no_argument, 0, 'N'},
       {"ipv6", no_argument, 0, '6'},
+      {"icmptype", required_argument, 0, 'T'},
       {0, 0, 0, 0}
    };
    const char *short_options =
-      "f:hp:r:t:i:b:vVdD:n:l:I:qgF:O:RN:6";
+      "f:hp:r:t:i:b:vVdD:n:l:I:qgF:O:RN:6T:";
    int arg;
    int options_index=0;
 
@@ -941,6 +1028,9 @@ local_process_options(int argc, char *argv[]) {
             break;
          case '6':	/* --ipv6 */
             ipv6_flag=1;
+            break;
+         case 'T':	/* --icmptype */
+            icmp_packet_type = strtol(optarg, (char **)NULL, 0);
             break;
          default:	/* Unknown option */
             usage();
