@@ -42,11 +42,6 @@
 
 /* Structures */
 
-struct port_entry {
-   struct port_entry *next;
-   uint16_t port;
-};
-
 /* Functions */
 
 unsigned int hstr_i(char *);
@@ -54,4 +49,3 @@ uint16_t in_cksum(uint16_t *, int);
 uint32_t get_source_ip(char *);
 void add_host_port(char *, unsigned, unsigned);
 void create_port_list(char *);
-void free_port_list(void);
