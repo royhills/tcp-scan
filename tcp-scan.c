@@ -205,9 +205,7 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
 /*
  *	Update the last send times for this host.
  */
-   if ((gettimeofday(last_packet_time, NULL)) != 0) {
-      err_sys("gettimeofday");
-   }
+   Gettimeofday(last_packet_time);
    he->last_send_time.tv_sec  = last_packet_time->tv_sec;
    he->last_send_time.tv_usec = last_packet_time->tv_usec;
    he->num_sent++;
@@ -249,10 +247,7 @@ initialise(void) {
  *	Create an MD5 hash of various things to use as a source of random
  *	data.
  */
-   if ((gettimeofday(&now,NULL)) != 0) {
-      perror("gettimeofday");
-      exit(1);
-   }
+   Gettimeofday(&now);
    pid=getpid();
    if ((uname(&uname_buf)) !=0 ) {
       perror("uname");
@@ -383,8 +378,7 @@ local_add_host(char *name, unsigned timeout) {
 
    num_hosts++;
 
-   if ((gettimeofday(&now,NULL)) != 0)
-      err_sys("gettimeofday");
+   Gettimeofday(&now);
 
    he->n = num_hosts;
    memcpy(&(he->addr), hp->h_addr_list[0], sizeof(struct in_addr));

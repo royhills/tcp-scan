@@ -116,8 +116,7 @@ main(int argc, char *argv[]) {
 /*
  *	Get program start time for statistics displayed on completion.
  */
-   if ((gettimeofday(&start_time, NULL)) != 0)
-      err_sys("gettimeofday");
+   Gettimeofday(&start_time);
 /*
  *	Call protocol-specific initialisation routine to perform any
  *	initial setup required.
@@ -161,8 +160,7 @@ main(int argc, char *argv[]) {
             debug++;
             break;
          case 'D':	/* --data */
-            if ((local_data = malloc(strlen(optarg)+1)) == NULL)
-               err_sys("malloc");
+            local_data = Malloc(strlen(optarg)+1);
             strcpy(local_data, optarg);
             break;
          default:	/* Unknown option */
@@ -258,8 +256,7 @@ main(int argc, char *argv[]) {
  *	Obtain current time and calculate deltas since last packet and
  *	last packet to this host.
  */
-      if ((gettimeofday(&now, NULL)) != 0)
-         err_sys("gettimeofday");
+      Gettimeofday(&now);
 /*
  *	If the last packet was sent more than interval us ago, then we can
  *	potentially send a packet to the current host.
@@ -322,8 +319,7 @@ main(int argc, char *argv[]) {
                   }
                   first_timeout=0;
                }
-               if ((gettimeofday(&last_packet_time, NULL)) != 0)
-                  err_sys("gettimeofday");
+               Gettimeofday(&last_packet_time);
             } else {	/* Retry limit not reached for this host */
                if (cursor->num_sent)
                   cursor->timeout *= backoff_factor;
@@ -384,8 +380,7 @@ main(int argc, char *argv[]) {
    close(sockfd);
    clean_up();
 
-   if ((gettimeofday(&end_time, NULL)) != 0)
-      err_sys("gettimeofday");
+   Gettimeofday(&end_time);
    timeval_diff(&end_time, &start_time, &elapsed_time);
    elapsed_seconds = (elapsed_time.tv_sec*1000 +
                       elapsed_time.tv_usec/1000) / 1000.0;
@@ -425,13 +420,11 @@ add_host(char *name, unsigned timeout) {
    if ((hp = gethostbyname(name)) == NULL)
       err_sys("gethostbyname");
 
-   if ((he = malloc(sizeof(struct host_entry))) == NULL)
-      err_sys("malloc");
+   he = Malloc(sizeof(struct host_entry));
 
    num_hosts++;
 
-   if ((gettimeofday(&now,NULL)) != 0)
-      err_sys("gettimeofday");
+   Gettimeofday(&now);
 
    he->n = num_hosts;
    memcpy(&(he->addr), hp->h_addr_list[0], sizeof(struct in_addr));
@@ -717,9 +710,7 @@ print_times(void) {
    struct timeval time_delta1;
    struct timeval time_delta2;
 
-   if ((gettimeofday(&time_now, NULL)) != 0) {
-      err_sys("gettimeofday");
-   }
+   Gettimeofday(&time_now);
    
    if (first_call) {
       first_call=0;
