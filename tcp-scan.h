@@ -30,7 +30,7 @@
 #define DEFAULT_BACKOFF_FACTOR 1.5      /* Default timeout backoff factor */
 #define DEFAULT_RETRY 3                 /* Default number of retries */
 #define DEFAULT_TIMEOUT 500             /* Default per-host timeout in ms */
-#define SNAPLEN 74			/* 14 (ether) + 20 (IP) + 40 (TCP) */
+#define SNAPLEN 94			/* 14 (ether) + 20 (IP) + 60 (TCP) */
 #define PROMISC 0			/* Enable promiscuous mode */
 #define TO_MS 0				/* Timeout for pcap_open_live() */
 #define OPTIMISE 1			/* Optimise pcap filter */
