@@ -239,7 +239,9 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
       unsigned char *optptr=(unsigned char *) (packet_in + ip_offset +
                                                4*(iph->ihl) +
                                                sizeof(struct tcphdr));
-      uint16_t *sptr;
+      uint16_t *sptr;	/* 16-bit ptr - used for MSS */
+      uint32_t *lptr1;	/* 32-bit ptr - used for timestamp value */
+      uint32_t *lptr2;	/* 32-bit ptr - used for timestamp value */
       unsigned char uc;
 /*
  *	Check if options have been truncated.
@@ -258,7 +260,7 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
 
       while (optlen > 0 && *optptr) {
          switch (*optptr) {
-            case TCPOPT_EOL:
+            case TCPOPT_EOL:	/* Shouldn't see this */
                optlen--;
                optptr++;
                if (options) {
@@ -317,13 +319,17 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
                break;
             case TCPOPT_TIMESTAMP:
                optlen -= 10;
+               lptr1 = (uint32_t *) (optptr+2);	/* TS Value */
+               lptr2 = (uint32_t *) (optptr+6);	/* TS Echo Reply */
                optptr += 10;
                if (options) {
                   cp = options;
-                  options = make_message("%s,TIMESTAMP", cp);
+                  options = make_message("%s,TIMESTAMP=%u,%u", cp,
+                                         ntohl(*lptr1), ntohl(*lptr2));
                   free(cp);
                } else {
-                  options = make_message("TIMESTAMP");
+                  options = make_message("TIMESTAMP=%u,%u", ntohl(*lptr1),
+                                         ntohl(*lptr2));
                }
                break;
             default:
@@ -730,10 +736,11 @@ local_help(void) {
    fprintf(stderr, "\n--wscale or -W\t\tAdd the WSCALE TCP option\n");
    fprintf(stderr, "\t\t\tThis option adds 4 bytes to the packet length.\n");
    fprintf(stderr, "\n--sack or -a\t\tAdd the SACKOK TCP option\n");
-   fprintf(stderr, "\t\t\tThis option adds 2 bytes to the packet length.\n");
+   fprintf(stderr, "\t\t\tThis option adds 4 bytes to the packet length. However\n");
+   fprintf(stderr, "\t\t\tit does not increase packet size when used with the\n");
+   fprintf(stderr, "\t\t\t--timestamp option.\n");
    fprintf(stderr, "\n--timestamp or -T\tAdd the TIMESTAMP TCP option\n");
-   fprintf(stderr, "\t\t\tThis option adds 10 bytes to the packet length.\n");
-   fprintf(stderr, "\t\t\tThis option adds 10 bytes to the packet length.\n");
+   fprintf(stderr, "\t\t\tThis option adds 12 bytes to the packet length.\n");
    fprintf(stderr, "\n--snap=<s> or -n <s>\tSet the pcap snap length to <s>. Default=%d.\n", SNAPLEN);
 }
 
