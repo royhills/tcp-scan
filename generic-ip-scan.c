@@ -57,10 +57,11 @@ extern char *local_data;		/* Local data from --data option */
  *      was received in the format: <IP-Address><TAB><Details>.
  */
 void
-display_packet(int n, char *packet_in, struct host_entry *he,
+display_packet(int n, unsigned char *packet_in, struct host_entry *he,
                struct in_addr *recv_addr) {
    char ip_str[MAXLINE];	/* IP address(es) to display at start */
    char *cp;
+   unsigned char *ucp;
    int i;
 
 /*
@@ -76,19 +77,18 @@ display_packet(int n, char *packet_in, struct host_entry *he,
  *	Display IP address, packet length and packet data (both as hex and
  *	text).
  */
-   cp = packet_in;
    printf("%sResponse: len=%d, data=",
              ip_str, n);
-   cp = packet_in;
+   ucp = packet_in;
    for (i=0; i<n; i++) {
-      printf("%.2x", (unsigned char) *cp);
-      cp++;
+      printf("%.2x", *ucp);
+      ucp++;
    }
    printf(" (");
-   cp = packet_in;
+   ucp = packet_in;
    for (i=0; i<n; i++) {
-      printf("%c", isprint(*cp)?*cp:'.');
-      cp++;
+      printf("%c", isprint(*ucp)?*ucp:'.');
+      ucp++;
    }
    printf(")\n");
 }
@@ -115,7 +115,7 @@ void
 send_packet(int s, struct host_entry *he, int ip_protocol,
             struct timeval *last_packet_time) {
    struct sockaddr_in sa_peer;
-   char buf[MAXIP];
+   unsigned char buf[MAXIP];
    int buflen;
    NET_SIZE_T sa_peer_len;
    int i;
