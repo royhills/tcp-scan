@@ -113,6 +113,26 @@ send_packet(int s, struct host_entry *he, int dest_port,
    char buf[MAXUDP];
    int buflen;
    NET_SIZE_T sa_peer_len;
+   int i;
+   unsigned char *cp;
+   static int first_time_through=1;
+/*
+ *	Initialise static packet data.
+ *	We can't do this in initialise() because local_data is not available
+ *	in that function.
+ */
+   if (first_time_through) {
+      if (strlen(local_data) % 2) {   /* Length is odd */
+         err_msg("Length of --data argument must be even (multiple of 2).");
+      }
+      data_len=strlen(local_data)/2;
+      if ((udp_data = malloc(data_len)) == NULL)
+         err_sys("malloc");
+      cp = udp_data;
+      for (i=0; i<data_len; i++)
+         *cp++=hstr_i(&local_data[i*2]);
+      first_time_through=0;
+   }
 /*
  *	Check that the host is live.  Complain if not.
  */
@@ -171,18 +191,6 @@ send_packet(int s, struct host_entry *he, int dest_port,
  */
 void
 initialise(void) {
-   int i;
-   unsigned char *cp;
-
-   if (strlen(local_data) % 2) {   /* Length is odd */
-      err_msg("Length of --data argument must be even (multiple of 2).");
-   }
-   data_len=strlen(local_data)/2;
-   if ((udp_data = malloc(data_len)) == NULL)
-      err_sys("malloc");
-   cp = udp_data;
-   for (i=0; i<data_len; i++)
-      *cp++=hstr_i(&local_data[i*2]);
 }
 
 /*
