@@ -37,7 +37,7 @@ int source_port_flag=0;
 uint16_t window=DEFAULT_WINDOW;		/* TCP Window size */
 int open_only=0;			/* Only show open ports? */
 char const scanner_name[] = "tcp-scan";
-char const scanner_version[] = "1.3";
+char const scanner_version[] = "1.4";
 
 extern int verbose;	/* Verbose level */
 extern int debug;	/* Debug flag */
@@ -54,6 +54,7 @@ extern int filename_flag;
 static uint32_t source_address;
 extern int pcap_fd;			/* pcap File Descriptor */
 static size_t ip_offset;		/* Offset to IP header in pcap pkt */
+static struct port_entry *port_list=NULL;
 
 /*
  *	display_packet -- Check and display received packet
@@ -528,6 +529,10 @@ local_help(void) {
    fprintf(stderr, "\t\t\tThe default window size is %u.\n", DEFAULT_WINDOW);
    fprintf(stderr, "\n--openonly or -o\tOnly display open ports.\n");
    fprintf(stderr, "\t\t\tWith this option, closed ports are not displayed.\n");
+   fprintf(stderr, "\n--servicefile=<s> or -S <s>\tUse service file <s> for TCP ports\n");
+   fprintf(stderr, "\t\t\tIf this option is specified, then the TCP ports to\n");
+   fprintf(stderr, "\t\t\tscan are read from the specified file.  The file is\n");
+   fprintf(stderr, "\t\t\tsame format as used by \"strobe\".\n");
 }
 
 /*
@@ -560,49 +565,69 @@ local_add_host(char *name, unsigned timeout) {
       char *p1;
       char *p2;
 
-      if (local_data == NULL)
-         err_msg("You must specify the TCP dest port with the --data option.");
+      if (local_data == NULL && port_list == NULL) {
+         warn_msg("You must specify the TCP dest ports with either the --data option");
+         err_msg("or with the --servicefile option.");
+      }
+
+      if (local_data && port_list) {
+         err_msg("You cannot specify both the --data and --servicefile options.");
+      }
 /*
  *	Copy local_data to port_spec, omitting all whitespace.
  */
-      port_spec = Malloc(strlen(local_data) + 1);
-      p1 = local_data;
-      p2 = port_spec;
-      while (*p1 != '\0') {
-         if (!isspace(*p1))
-            *p2++=*p1;
-         p1++;
+      if (local_data) {
+         port_spec = Malloc(strlen(local_data) + 1);
+         p1 = local_data;
+         p2 = port_spec;
+         while (*p1 != '\0') {
+            if (!isspace(*p1))
+               *p2++=*p1;
+            p1++;
+         }
+         *p2 = '\0';
       }
-      *p2 = '\0';
       first_time_through=0;
    }
+   if (local_data) {	/* --data option specified */
 /*
  *	Determine the ports in the port spec, and add a host entry for
  *	each one.
  */
-   cp = port_spec;
-   while (*cp != '\0') {
-      unsigned port1;
-      unsigned port2;
-      unsigned i;
-
-      port1=strtoul(cp, &cp, 10);
-      if (!port1 || (port1 & 0x80000000))	/* Zero or -ve */
-         err_msg("Invalid port specification: %s", port_spec);
-      if (*cp == ',' || *cp == '\0') {	/* Single port specification */
-         add_host_port(name, timeout, port1);
-      } else if (*cp == '-') {		/* Inclusive range */
-         cp++;
-         port2=strtoul(cp, &cp, 10);
-         if (!port2 || port2 <= port1)	/* Missing end or empty range */
+      cp = port_spec;
+      while (*cp != '\0') {
+         unsigned port1;
+         unsigned port2;
+         unsigned i;
+   
+         port1=strtoul(cp, &cp, 10);
+         if (!port1 || (port1 & 0x80000000))	/* Zero or -ve */
             err_msg("Invalid port specification: %s", port_spec);
-         for (i=port1; i<=port2; i++)
-            add_host_port(name, timeout, i);
-      } else {
-         err_msg("Invalid port specification: %s", port_spec);
+         if (*cp == ',' || *cp == '\0') {	/* Single port specification */
+            add_host_port(name, timeout, port1);
+         } else if (*cp == '-') {		/* Inclusive range */
+            cp++;
+            port2=strtoul(cp, &cp, 10);
+            if (!port2 || port2 <= port1)	/* Missing end or empty range */
+               err_msg("Invalid port specification: %s", port_spec);
+            for (i=port1; i<=port2; i++)
+               add_host_port(name, timeout, i);
+         } else {
+            err_msg("Invalid port specification: %s", port_spec);
+         }
+         if (*cp == ',')
+            cp++;  /* Move on to next entry */
       }
-      if (*cp == ',')
-         cp++;  /* Move on to next entry */
+   } else {	/* --servicefile option specified */
+/*
+ *	Add a host entry for each port in the port list.
+ */
+      struct port_entry *pe=port_list;
+
+      while (pe) {
+         add_host_port(name, timeout, pe->port);
+         pe = pe->next;
+      }
    }
 
    return 1;	/* Replace generic add_host() function */
@@ -929,9 +954,10 @@ local_process_options(int argc, char *argv[]) {
       {"seq", required_argument, 0, 'e'},
       {"window", required_argument, 0, 'w'},
       {"openonly", no_argument, 0, 'o'},
+      {"servicefile", required_argument, 0, 'S'},
       {0, 0, 0, 0}
    };
-   const char *short_options = "f:hp:r:t:i:b:vVdD:s:e:w:o";
+   const char *short_options = "f:hp:r:t:i:b:vVdD:s:e:w:oS:";
    int arg;
    int options_index=0;
 
@@ -987,6 +1013,9 @@ local_process_options(int argc, char *argv[]) {
          case 'o':	/* --openonly */
             open_only=1;
             break;
+         case 'S':	/* --servicefile */
+            create_port_list(optarg);
+            break;
          default:	/* Unknown option */
             usage();
             break;
@@ -994,3 +1023,90 @@ local_process_options(int argc, char *argv[]) {
    }
    return 1;	/* Replace generic process_options() function */
 }
+
+/*
+ *	create_port_list	-- Create TCP port list from services file
+ *
+ *	Inputs:
+ *
+ *	filename	The services file name
+ *
+ *	Outputs:
+ *
+ *	None.
+ *
+ *	This function creates the TCP port list from the specified services
+ *	file.
+ */
+void
+create_port_list(char *filename) {
+    FILE *fh;
+    char lbuf[1024];
+    char desc[256];
+    char portname[17];
+    unsigned int port;
+    char prot[4];
+    struct port_entry *pe;
+
+    prot[3]='\0';
+    if (!(fh = fopen (filename, "r")))
+      err_sys("fopen %s", filename);
+
+    while (fgets (lbuf, sizeof (lbuf), fh))
+    {
+	char *p;
+        int n;
+
+	if (strchr("*# \t\n", lbuf[0]))
+            continue;
+	if (!(p = strchr (lbuf, '/')))
+            continue;
+	*p = ' ';
+	desc[0]='\0';
+	n=sscanf(lbuf, "%16s %u %3s %255[^\r\n]", portname, &port, prot, desc);
+        if (n < 3) {
+           warn_msg("Ignoring invalid entry: %s", lbuf);
+	   continue;
+        }
+        if (strcmp (prot, "tcp")) {
+           warn_msg("Ignoring non-TCP entry: %s", lbuf);
+	   continue;
+        }
+        if (port < 1 || port > 65535)
+           err_msg("Invalid port number: %u.  Port must be in range 1-65535",
+                   port);
+        pe=Malloc(sizeof(struct port_entry));
+        pe->port = port;
+        pe->next = port_list;
+        port_list = pe;
+    }
+}
+
+/*
+ *	free_port_list	-- Delete TCP port list
+ *
+ *	Inputs:
+ *
+ *	None.
+ *
+ *	Outputs:
+ *
+ *	None.
+ *
+ *	This function deletes the TCP port list that was previously created
+ *	with create_port_list() and frees the associated memory.
+ */
+void
+free_port_list(void) {
+   struct port_entry *temp;
+   struct port_entry *p;
+
+   p = port_list;
+
+   while (p) {
+      temp = p->next;
+      free(p);
+      p = temp;
+   }
+}
+
