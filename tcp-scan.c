@@ -40,14 +40,13 @@ extern int debug;	/* Debug flag */
 extern char *local_data;		/* Local data from --data option */
 extern struct host_entry *rrlist;	/* Round-robin linked list "the list" */
 extern unsigned num_hosts;		/* Number of entries in the list */
-extern unsigned rejected;		/* Packets rejected because not ours */
 extern unsigned max_iter;		/* Max iterations in find_host() */
 extern pcap_t *handle;
 extern struct host_entry *cursor;
 extern unsigned responders;		/* Number of hosts which responded */
 
 static uint32_t source_address;
-static int pcap_fd;			/* pcap File Descriptor */
+extern int pcap_fd;			/* pcap File Descriptor */
 static size_t ip_offset;		/* Offset to IP header in pcap pkt */
 
 /*
@@ -370,12 +369,13 @@ initialise(void) {
  */
    filter_string=make_message("tcp dst port %u and tcp[8:4] = %u",
                               source_port, seq_no+1);
-   printf("BPF Filter string: %s\n", filter_string);
+   printf("Filter string: \"%s\"\n", filter_string);
    if (!(handle = pcap_open_live(if_name, SNAPLEN, PROMISC, TO_MS, errbuf)))
       err_msg("pcap_open_live: %s\n", errbuf);
    if ((datalink=pcap_datalink(handle)) < 0)
       err_msg("pcap_datalink: %s\n", pcap_geterr(handle));
-   printf("Interface: %s, datalink type: %s\n", if_name,
+   printf("Interface: %s, datalink type: %s (%s)\n", if_name,
+          pcap_datalink_val_to_name(datalink),
           pcap_datalink_val_to_description(datalink));
    switch (datalink) {
       case DLT_EN10MB:
@@ -417,6 +417,14 @@ initialise(void) {
  */
 void
 clean_up(void) {
+   struct pcap_stat stats;
+
+   if ((pcap_stats(handle, &stats)) < 0)
+      err_msg("pcap_stats: %s\n", pcap_geterr(handle));
+
+   printf("%u packets received by filter, %u packets dropped by kernel\n",
+          stats.ps_recv, stats.ps_drop);
+   pcap_close(handle);
 }
 
 /*
