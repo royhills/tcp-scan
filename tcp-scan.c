@@ -63,6 +63,7 @@ extern unsigned responders;		/* Number of hosts which responded */
 extern char filename[MAXLINE];
 extern int filename_flag;
 extern int random_flag;			/* Randomise the list */
+extern int numeric_flag;		/* IP addreses only */
 
 static uint32_t source_address;
 extern int pcap_fd;			/* pcap File Descriptor */
@@ -887,29 +888,43 @@ local_add_host(char *name, unsigned timeout) {
 
 void
 add_host_port(char *name, unsigned timeout, unsigned port) {
-   struct hostent *hp;
+   struct hostent *hp=NULL;
+   struct in_addr inp;
    struct host_entry *he;
    struct timeval now;
+   static int num_left=0;	/* Number of free entries left */
 
    if (port < 1 || port > 65535)
       err_msg("Invalid port number: %u.  Port must be in range 1-65535", port);
 
-   if ((hp = gethostbyname(name)) == NULL)
-      err_sys("gethostbyname failed for \"%s\"", name);
+   if (numeric_flag) {
+      if (!(inet_aton(name, &inp)))
+         err_sys("inet_aton failed for \"%s\"", name);
+   } else {
+      if ((hp = gethostbyname(name)) == NULL)
+         err_sys("gethostbyname failed for \"%s\"", name);
+   }
 
+   if (!num_left) {	/* No entries left, allocate some more */
+      if (helist)
+         helist=Realloc(helist, (num_hosts * sizeof(struct host_entry)) +
+                        REALLOC_COUNT*sizeof(struct host_entry));
+      else
+         helist=Malloc(REALLOC_COUNT*sizeof(struct host_entry));
+      num_left = REALLOC_COUNT;
+   }
+
+   he = helist + num_hosts; /* Would array notation be better? */
    num_hosts++;
-
-   if (helist)
-      helist=Realloc(helist, num_hosts * sizeof(struct host_entry));
-   else
-      helist=Malloc(sizeof(struct host_entry));
-
-   he = helist + (num_hosts-1); /* Would array notation be better? */
+   num_left--;
 
    Gettimeofday(&now);
 
    he->n = num_hosts;
-   memcpy(&(he->addr), hp->h_addr_list[0], sizeof(struct in_addr));
+   if (numeric_flag)
+      memcpy(&(he->addr), &inp, sizeof(struct in_addr));
+   else
+      memcpy(&(he->addr), hp->h_addr_list[0], sizeof(struct in_addr));
    he->live = 1;
    he->timeout = timeout * 1000;	/* Convert from ms to us */
    he->num_sent = 0;
@@ -1214,9 +1229,10 @@ local_process_options(int argc, char *argv[]) {
       {"df", required_argument, 0, 'F'},
       {"tos", required_argument, 0, 'O'},
       {"random", no_argument, 0, 'R'},
+      {"numeric", no_argument, 0, 'N'},
       {0, 0, 0, 0}
    };
-   const char *short_options = "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:WaTn:l:I:qgF:O:R";
+   const char *short_options = "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:WaTn:l:I:qgF:O:RN";
    int arg;
    int options_index=0;
 
@@ -1326,6 +1342,9 @@ local_process_options(int argc, char *argv[]) {
             break;
          case 'R':	/* --random */
             random_flag=1;
+            break;
+         case 'N':	/* --numeric */
+            numeric_flag=1;
             break;
          default:	/* Unknown option */
             usage();
