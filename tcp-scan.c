@@ -68,11 +68,13 @@ extern char filename[MAXLINE];
 extern int filename_flag;
 extern int random_flag;			/* Randomise the list */
 extern int numeric_flag;		/* IP addreses only */
+extern int ipv6_flag;			/* IPv6 */
 
 static uint32_t source_address;
 extern int pcap_fd;			/* pcap File Descriptor */
 static size_t ip_offset;		/* Offset to IP header in pcap pkt */
 static uint16_t *port_list=NULL;
+static char *ga_err_msg;		/* getaddrinfo error message */
 
 /*
  *	display_packet -- Check and display received packet
@@ -110,8 +112,8 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
  *	Set msg to the IP address of the host entry, plus the address of the
  *	responder if different, and a tab.
  */
-   msg = make_message("%s\t", inet_ntoa(he->addr));
-   if ((he->addr).s_addr != recv_addr->s_addr) {
+   msg = make_message("%s\t", my_ntoa(he->addr));
+   if ((he->addr).v4.s_addr != recv_addr->s_addr) {	/* XXXX */
       cp = msg;
       msg = make_message("%s(%s) ", cp, inet_ntoa(*recv_addr));
       free(cp);
@@ -472,7 +474,7 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
  */
    memset(&sa_peer, '\0', sizeof(sa_peer));
    sa_peer.sin_family = AF_INET;
-   sa_peer.sin_addr.s_addr = he->addr.s_addr;
+   sa_peer.sin_addr.s_addr = he->addr.v4.s_addr;
    sa_peer_len = sizeof(sa_peer);
 /*
  *	Update the last send times for this host.
@@ -536,7 +538,7 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
  */
    memset(pseudo, '\0', sizeof(struct pseudo_hdr));
    pseudo->s_addr = source_address;
-   pseudo->d_addr = he->addr.s_addr;
+   pseudo->d_addr = he->addr.v4.s_addr;
    pseudo->proto  = ip_protocol;
    pseudo->len    = htons(sizeof(struct tcphdr) + options_len);
 /*
@@ -588,7 +590,7 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    iph->protocol = ip_protocol;
    iph->check = 0;	/* Linux kernel fills this in */
    iph->saddr = source_address;
-   iph->daddr = he->addr.s_addr;
+   iph->daddr = he->addr.v4.s_addr;
 /*
  *	Copy the required data into the output buffer "buf" and set "buflen"
  *	to the number of bytes in this buffer.
@@ -597,9 +599,9 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
 /*
  *	Send the packet.
  */
-   if (debug) {print_times(); printf("send_packet: #%u to host entry %u (%s) tmo %d\n", he->num_sent, he->n, inet_ntoa(he->addr), he->timeout);}
+   if (debug) {print_times(); printf("send_packet: #%u to host entry %u (%s) tmo %d\n", he->num_sent, he->n, my_ntoa(he->addr), he->timeout);}
    if (verbose > 1)
-      warn_msg("---\tSending packet #%u to host entry %u (%s) tmo %d", he->num_sent, he->n, inet_ntoa(he->addr), he->timeout);
+      warn_msg("---\tSending packet #%u to host entry %u (%s) tmo %d", he->num_sent, he->n, my_ntoa(he->addr), he->timeout);
    if ((sendto(s, buf, buflen, 0, (struct sockaddr *) &sa_peer, sa_peer_len)) < 0) {
       err_sys("sendto");
    }
@@ -873,7 +875,6 @@ local_help(void) {
    fprintf(stderr, "\t\t\tfrom the set of: CWR,ECN,URG,ACK,PSH,RST,SYN,FIN.\n");
    fprintf(stderr, "\t\t\tIf this option is not specified, the flags default\n");
    fprintf(stderr, "\t\t\tto SYN.\n");
-
 }
 
 /*
@@ -959,21 +960,32 @@ local_add_host(char *name, unsigned timeout) {
 
 void
 add_host_port(char *name, unsigned timeout, unsigned port) {
-   struct hostent *hp=NULL;
-   struct in_addr inp;
+   ip_address *hp=NULL;
+   ip_address addr;
    struct host_entry *he;
    struct timeval now;
    static int num_left=0;	/* Number of free entries left */
+   int result;
 
    if (port < 1 || port > 65535)
       err_msg("Invalid port number: %u.  Port must be in range 1-65535", port);
 
    if (numeric_flag) {
-      if (!(inet_aton(name, &inp)))
-         err_sys("inet_aton failed for \"%s\"", name);
+      if (ipv6_flag) {
+         result = inet_pton(AF_INET6, name, &(addr.v6));
+      } else {
+         result = inet_pton(AF_INET, name, &(addr.v4));
+      }
+      if (result <= 0)
+         err_sys("inet_pton failed for \"%s\"", name);
    } else {
-      if ((hp = gethostbyname(name)) == NULL)
-         err_sys("gethostbyname failed for \"%s\"", name);
+      if (ipv6_flag) {
+         hp = get_host_address(name, AF_INET6, &addr, &ga_err_msg);
+      } else {
+         hp = get_host_address(name, AF_INET, &addr, &ga_err_msg);
+      }
+      if (hp == NULL)
+         err_msg("get_host_address failed for \"%s\": %s", name, ga_err_msg);
    }
 
    if (!num_left) {	/* No entries left, allocate some more */
@@ -992,10 +1004,11 @@ add_host_port(char *name, unsigned timeout, unsigned port) {
    Gettimeofday(&now);
 
    he->n = num_hosts;
-   if (numeric_flag)
-      memcpy(&(he->addr), &inp, sizeof(struct in_addr));
-   else
-      memcpy(&(he->addr), hp->h_addr_list[0], sizeof(struct in_addr));
+   if (ipv6_flag) {
+      memcpy(&(he->addr.v6), &(addr.v6), sizeof(struct in6_addr));
+   } else {
+      memcpy(&(he->addr.v4), &(addr.v4), sizeof(struct in_addr));
+   }
    he->live = 1;
    he->timeout = timeout * 1000;	/* Convert from ms to us */
    he->num_sent = 0;
@@ -1147,7 +1160,7 @@ local_find_host(struct host_entry **ptr, struct host_entry **he,
    p = he;
    do {
       iterations++;
-      if (((*p)->addr.s_addr == addr->s_addr) &&
+      if (((*p)->addr.v4.s_addr == addr->s_addr) &&
           (ntohs(tcph->source) == (*p)->dport)) {
          found = 1;
       } else {
@@ -1303,10 +1316,11 @@ local_process_options(int argc, char *argv[]) {
       {"numeric", no_argument, 0, 'N'},
       {"portname", no_argument, 0, 'P'},
       {"flags", required_argument, 0, 'L'},
+      {"ipv6", no_argument, 0, '6'},
       {0, 0, 0, 0}
    };
    const char *short_options =
-      "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:WaTn:l:I:qgF:O:RNPL:";
+      "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:WaTn:l:I:qgF:O:RNPL:6";
    int arg;
    int options_index=0;
 
@@ -1427,6 +1441,9 @@ local_process_options(int argc, char *argv[]) {
             tcp_flags_flag=1;
             process_tcp_flags(optarg);
 /* CWR,ECN,URG,ACK,PSH,RST,SYN,FIN */
+            break;
+         case '6':	/* --ipv6 */
+            ipv6_flag=1;
             break;
          default:	/* Unknown option */
             usage();
