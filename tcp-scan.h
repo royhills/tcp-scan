@@ -27,6 +27,14 @@
 #define DEFAULT_RETRY 3                 /* Default number of retries */
 #define DEFAULT_TIMEOUT 500             /* Default per-host timeout in ms */
 
+/* Structures */
+
+struct tcp_data {
+   uint32_t seq;	/* Sequence number */
+   uint16_t sport;	/* Source port */
+   uint16_t dport;	/* Source port */
+};
+
 /* Functions */
 
 unsigned int hstr_i(char *);
