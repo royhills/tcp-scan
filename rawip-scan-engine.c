@@ -1,21 +1,23 @@
 /*
- * The SQL Slammer Scanner (sql-slammer-scan) is Copyright (C) 2003 Roy Hills,
+ * The UDP Scan Engine (udp-scan-engine) is Copyright (C) 2003 Roy Hills,
  * NTA Monitor Ltd.
  *
  * $Id$
  *
- * sql-slammer-scan -- The SQL Slammer Scanner
+ * udp-scan-engine -- The UDP Scan Engine
  *
  * Author:	Roy Hills
  * Date:	11 September 2002
  *
  * Usage:
- *    sql-slammer-scan [options] [host...]
+ *    <protocol-specific-scanner> [options] [host...]
  *
  * Description:
  *
- * sql-slammer-scan sends probe packets to UDP port 1434 on the specified
- * hosts and displays any responses received.
+ * udp-scan-engine sends probe packets to a defined UDP port on the specified
+ * hosts and displays any responses received.  It is a protocol-neutral engine
+ * which needs some protocol specific functions (in a seperate source file) to
+ * build a working scanner.
  * 
  */
 
@@ -31,7 +33,15 @@ unsigned responders = 0;		/* Number of hosts which responded */
 unsigned live_count;			/* Number of entries awaiting reply */
 int verbose=0;				/* Verbose level */
 int debug = 0;				/* Debug flag */
+
 extern int dest_port;			/* UDP destination port */
+extern unsigned interval;		/* Interval between packets */
+extern unsigned select_timeout;		/* Select timeout */
+extern char const scanner_name[];	/* Scanner Name */
+extern unsigned retry;			/* Number of retries */
+extern unsigned timeout;		/* Per-host timeout */
+extern float backoff_factor;		/* Backoff factor */
+extern int source_port;			/* UDP source port */
 
 int
 main(int argc, char *argv[]) {
@@ -62,18 +72,13 @@ main(int argc, char *argv[]) {
    struct timeval now;
    char packet_in[MAXUDP];	/* Received packet */
    int n;
+   char namebuf[MAXLINE];
    struct host_entry *temp_cursor;
    struct hostent *hp;
    struct timeval diff;		/* Difference between two timevals */
    unsigned long loop_timediff;	/* Time since last packet sent in ms */
    unsigned long host_timediff; /* Time since last packet sent to this host */
    int arg_str_space;		/* Used to avoid buffer overruns when copying */
-   unsigned retry = DEFAULT_RETRY;		/* Number of retries */
-   unsigned timeout = DEFAULT_TIMEOUT;	/* Per-host timeout */
-   unsigned interval = DEFAULT_INTERVAL;	/* Interval between packets */
-   unsigned select_timeout = DEFAULT_SELECT_TIMEOUT;	/* Select timeout */
-   float backoff = DEFAULT_BACKOFF_FACTOR;	/* Backoff factor */
-   int source_port = DEFAULT_SOURCE_PORT;	/* UDP source port */
    struct timeval last_packet_time;	/* Time last packet was sent */
 /*
  *	Open syslog channel and log arguments if required.
@@ -82,7 +87,7 @@ main(int argc, char *argv[]) {
  *	we use strncat and keep track of the remaining buffer space.
  */
 #ifdef SYSLOG
-   openlog("sql-slammer-scan", LOG_PID, SYSLOG_FACILITY);
+   openlog(scanner_name, LOG_PID, SYSLOG_FACILITY);
    arg_str[0] = '\0';
    arg_str_space = MAXLINE;	/* Amount of space in the arg_str buffer */
    for (arg=0; arg<argc; arg++) {
@@ -129,7 +134,7 @@ main(int argc, char *argv[]) {
             interval=atoi(optarg);
             break;
          case 'b':	/* --backoff */
-            backoff=atof(optarg);
+            backoff_factor=atof(optarg);
             break;
          case 'w':	/* --selectwait */
             select_timeout=atoi(optarg);
@@ -154,7 +159,8 @@ main(int argc, char *argv[]) {
  *	If we're not reading from a file, then we must have some hosts
  *	given as command line arguments.
  */
-   hp = gethostbyname("sql-slammer-scan-target.test.nta-monitor.com");
+   sprintf(namebuf, "%s-target.test.nta-monitor.com", scanner_name);
+   hp = gethostbyname(namebuf);
    if (!filename_flag) 
       if ((argc - optind) < 1)
          usage();
@@ -270,7 +276,7 @@ main(int argc, char *argv[]) {
                remove_host(cursor);
             } else {	/* Retry limit not reached for this host */
                if (cursor->num_sent) {
-                  cursor->timeout *= backoff;
+                  cursor->timeout *= backoff_factor;
                }
                send_packet(sockfd, cursor, dest_port, &last_packet_time);
                advance_cursor();
@@ -532,7 +538,7 @@ dump_list(void) {
  */
 void
 usage(void) {
-   fprintf(stderr, "Usage: sql-slammer-scan [options] [hosts...]\n");
+   fprintf(stderr, "Usage: %s [options] [hosts...]\n", scanner_name);
    fprintf(stderr, "\n");
    fprintf(stderr, "Hosts are specified on the command line unless the --file option is specified.\n");
    fprintf(stderr, "\n");
@@ -542,28 +548,28 @@ usage(void) {
    fprintf(stderr, "\n--file=<fn> or -f <fn>\tRead hostnames or addresses from the specified file\n");
    fprintf(stderr, "\t\t\tinstead of from the command line. One name or IP\n");
    fprintf(stderr, "\t\t\taddress per line.  Use \"-\" for standard input.\n");
-   fprintf(stderr, "\n--sport=<p> or -s <p>\tSet UDP source port to <p>, default=%d, 0=random.\n", DEFAULT_SOURCE_PORT);
+   fprintf(stderr, "\n--sport=<p> or -s <p>\tSet UDP source port to <p>, default=%d, 0=random.\n", source_port);
    fprintf(stderr, "\n--dport=<p> or -p <p>\tSet UDP destination port to <p>, default=%d.\n", dest_port);
    fprintf(stderr, "\n--retry=<n> or -r <n>\tSet total number of attempts per host to <n>,\n");
-   fprintf(stderr, "\t\t\tdefault=%d.\n", DEFAULT_RETRY);
-   fprintf(stderr, "\n--timeout=<n> or -t <n>\tSet initial per host timeout to <n> ms, default=%d.\n", DEFAULT_TIMEOUT);
+   fprintf(stderr, "\t\t\tdefault=%d.\n", retry);
+   fprintf(stderr, "\n--timeout=<n> or -t <n>\tSet initial per host timeout to <n> ms, default=%d.\n", timeout);
    fprintf(stderr, "\t\t\tThis timeout is for the first packet sent to each host.\n");
    fprintf(stderr, "\t\t\tsubsequent timeouts are multiplied by the backoff\n");
    fprintf(stderr, "\t\t\tfactor which is set with --backoff.\n");
-   fprintf(stderr, "\n--interval=<n> or -i <n> Set minimum packet interval to <n> ms, default=%d.\n", DEFAULT_INTERVAL);
+   fprintf(stderr, "\n--interval=<n> or -i <n> Set minimum packet interval to <n> ms, default=%d.\n", interval);
    fprintf(stderr, "\t\t\tThis controls the outgoing bandwidth usage by limiting\n");
    fprintf(stderr, "\t\t\tthe rate at which packets can be sent.  The packet\n");
    fprintf(stderr, "\t\t\tinterval will be greater than or equal to this number\n");
    fprintf(stderr, "\t\t\tand will be a multiple of the select wait specified\n");
    fprintf(stderr, "\t\t\twith --selectwait.  Thus --interval=75 --selectwait=10\n");
    fprintf(stderr, "\t\t\twill result in a packet interval of 80ms.\n");
-   fprintf(stderr, "\n--backoff=<b> or -b <b>\tSet timeout backoff factor to <b>, default=%.2f.\n", DEFAULT_BACKOFF_FACTOR);
+   fprintf(stderr, "\n--backoff=<b> or -b <b>\tSet timeout backoff factor to <b>, default=%.2f.\n", backoff_factor);
    fprintf(stderr, "\t\t\tThe per-host timeout is multiplied by this factor\n");
    fprintf(stderr, "\t\t\tafter each timeout.  So, if the number of retrys\n");
    fprintf(stderr, "\t\t\tis 3, the initial per-host timeout is 500ms and the\n");
    fprintf(stderr, "\t\t\tbackoff factor is 1.5, then the first timeout will be\n");
    fprintf(stderr, "\t\t\t500ms, the second 750ms and the third 1125ms.\n");
-   fprintf(stderr, "\n--selectwait=<n> or -w <n> Set select wait to <n> ms, default=%d.\n", DEFAULT_SELECT_TIMEOUT);
+   fprintf(stderr, "\n--selectwait=<n> or -w <n> Set select wait to <n> ms, default=%d.\n", select_timeout);
    fprintf(stderr, "\t\t\tThis controls the timeout used in the select(2) call.\n");
    fprintf(stderr, "\t\t\tIt defines the lower bound and granularity of the\n");
    fprintf(stderr, "\t\t\tpacket interval set with --interval.  Smaller values\n");
