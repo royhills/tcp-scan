@@ -33,6 +33,7 @@ unsigned responders = 0;		/* Number of hosts which responded */
 unsigned live_count;			/* Number of entries awaiting reply */
 int verbose=0;				/* Verbose level */
 int debug = 0;				/* Debug flag */
+char local_data[MAXLINE];		/* Local data for scanner */
 
 extern int dest_port;			/* UDP destination port */
 extern unsigned interval;		/* Interval between packets */
@@ -59,9 +60,10 @@ main(int argc, char *argv[]) {
       {"verbose", no_argument, 0, 'v'},
       {"version", no_argument, 0, 'V'},
       {"debug", no_argument, 0, 'd'},
+      {"data", required_argument, 0, 'D'},
       {0, 0, 0, 0}
    };
-   const char *short_options = "f:hs:p:r:t:i:b:w:vVd";
+   const char *short_options = "f:hs:p:r:t:i:b:w:vVdD:";
    int arg;
    char arg_str[MAXLINE];	/* Args as string for syslog */
    int options_index=0;
@@ -149,6 +151,9 @@ main(int argc, char *argv[]) {
             break;
          case 'd':	/* --debug */
             debug++;
+            break;
+         case 'D':	/* --data */
+            strncpy(local_data, optarg, MAXLINE);
             break;
          default:	/* Unknown option */
             usage();
@@ -588,6 +593,9 @@ usage(void) {
    fprintf(stderr, "\t\t\t3 - Display the host list before\n");
    fprintf(stderr, "\t\t\t    scanning starts.\n");
    fprintf(stderr, "\n--version or -V\t\tDisplay program version and exit.\n");
+   fprintf(stderr, "\n--data=<d> or -D <d>\tSpecify protocol-specific data.\n");
+   fprintf(stderr, "\t\t\tThe meaning of the data varies depending on the protocol\n");
+   fprintf(stderr, "\t\t\tbeing scanned.\n");
    fprintf(stderr, "\n");
    fprintf(stderr, "Report bugs or send suggestions to %s\n", PACKAGE_BUGREPORT);
    exit(1);
