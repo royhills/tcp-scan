@@ -135,6 +135,7 @@ int local_add_host(char *, unsigned);
 int local_find_host(struct host_entry **, struct host_entry *,
                     struct in_addr *, const unsigned char *, int);
 char *make_message(const char *, ...);
+char *printable(unsigned char*, size_t);
 void callback(u_char *, const struct pcap_pkthdr *, const u_char *);
 /* Wrappers */
 int Gettimeofday(struct timeval *);
