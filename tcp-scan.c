@@ -86,11 +86,11 @@ display_packet(int n, unsigned char *packet_in, struct host_entry *he,
  *	Determine type of response: SYN-ACK, RST or something else
  */
    if (tcph->syn && tcph->ack) {
-      printf("%sSYN-ACK (len=%d)\n", ip_str, n);
+      printf("%sSYN-ACK (len=%d, ttl=%u)\n", ip_str, n, iph->ttl);
    } else if (tcph->rst) {
-      printf("%sRST (len=%d)\n", ip_str, n);
+      printf("%sRST (len=%d, ttl=%u)\n", ip_str, n, iph->ttl);
    } else {
-      printf("%sUNKNOWN TCP PACKET (len=%d)\n", ip_str, n);
+      printf("%sUNKNOWN TCP PACKET (len=%d, ttl=%u)\n", ip_str, n, iph->ttl);
    }
 }
 
@@ -118,6 +118,7 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    struct sockaddr_in sa_peer;
    char buf[MAXIP];
    int buflen;
+   char *if_name;
    NET_SIZE_T sa_peer_len;
    struct tcp_data *tdp;
    static int first_time_through=1;
@@ -140,7 +141,10 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
  *	in that function.
  */
    if (first_time_through) {
-      source_address = get_source_ip("eth0");
+      if (!(if_name=getenv("RMIF")))
+         if_name="eth0";
+      source_address = get_source_ip(if_name);
+      printf("Using interface %s\n", if_name);
       first_time_through=0;
    }
 /*
