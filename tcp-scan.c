@@ -224,9 +224,9 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
       df = "no";
    }
    cp = msg;
-   msg = make_message("%sDF=%s flags=%s win=%u ttl=%u id=%u ip_len=%d", cp,
-                      df, flags, ntohs(tcph->window), iph->ttl, ntohs(iph->id),
-                      ntohs(iph->tot_len));
+   msg = make_message("%sDF=%s TOS=%u flags=%s win=%u ttl=%u id=%u ip_len=%d",
+                      cp, df, iph->tos, flags, ntohs(tcph->window), iph->ttl,
+                      ntohs(iph->id), ntohs(iph->tot_len));
    free(cp);
    free(flags);
 /*
@@ -248,19 +248,23 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
  */
       if (n - ip_offset - sizeof(struct iphdr) - sizeof(struct tcphdr)
           < optlen) {
+         if (verbose)
+            warn_msg("---\tCaptured packet length %d is too short for calculated TCP options length %d.  Adjusting options length", n, optlen);
          optlen = n - ip_offset - sizeof(struct iphdr) - sizeof(struct tcphdr);
          trunc=1;
       }
       if (ntohs(iph->tot_len) - sizeof(struct iphdr) - sizeof(struct tcphdr)
           < optlen) {
+         if (verbose)
+            warn_msg("---\tClaimed IP packet length %d is too short for calculated TCP options length %d.  Adjusting options length", ntohs(iph->tot_len), optlen);
          optlen = ntohs(iph->tot_len) - sizeof(struct iphdr) -
                   sizeof(struct tcphdr);
          trunc=1;
       }
 
-      while (optlen > 0 && *optptr) {
+      while (optlen > 0) {
          switch (*optptr) {
-            case TCPOPT_EOL:	/* Shouldn't see this */
+            case TCPOPT_EOL:
                optlen--;
                optptr++;
                if (options) {
@@ -443,6 +447,15 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    sa_peer.sin_addr.s_addr = he->addr.s_addr;
    sa_peer_len = sizeof(sa_peer);
 /*
+ *	Update the last send times for this host.
+ *	We do this here because we can also use this value for the TCP
+ *	timestamp option.
+ */
+   Gettimeofday(last_packet_time);
+   he->last_send_time.tv_sec  = last_packet_time->tv_sec;
+   he->last_send_time.tv_usec = last_packet_time->tv_usec;
+   he->num_sent++;
+/*
  *	Add TCP options.  We do this before the TCP header because the
  *	options must be covered by the TCP checksum calculation.
  *
@@ -458,6 +471,7 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
       options_len += 4;
    }
    if (timestamp_flag) {
+      uint32_t tsval=htonl(last_packet_time->tv_sec);
       if (sack_flag) {
          *optptr++ = 4;		/* Kind=4 (SACKOK) */
          *optptr++ = 2;		/* Len=2 bytes */
@@ -467,10 +481,8 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
       }
       *optptr++ = 8;		/* Kind=8 (TIMESTAMP) */
       *optptr++ = 10;		/* Len=10 bytes */
-      *optptr++ = 0xde;		/* TS Value */
-      *optptr++ = 0xad;
-      *optptr++ = 0xbe;
-      *optptr++ = 0xef;
+      memcpy(optptr, &tsval, sizeof(tsval));	/* TS Value */
+      optptr += sizeof(tsval);
       *optptr++ = 0;		/* TS Echo Reply */
       *optptr++ = 0;
       *optptr++ = 0;
@@ -531,13 +543,6 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
  *	to the number of bytes in this buffer.
  */
    buflen=sizeof(struct iphdr) + sizeof(struct tcphdr) + options_len;
-/*
- *	Update the last send times for this host.
- */
-   Gettimeofday(last_packet_time);
-   he->last_send_time.tv_sec  = last_packet_time->tv_sec;
-   he->last_send_time.tv_usec = last_packet_time->tv_usec;
-   he->num_sent++;
 /*
  *	Send the packet.
  */
