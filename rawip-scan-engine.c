@@ -642,7 +642,7 @@ usage(void) {
    fprintf(stderr, "\t\t\tThis timeout is for the first packet sent to each host.\n");
    fprintf(stderr, "\t\t\tsubsequent timeouts are multiplied by the backoff\n");
    fprintf(stderr, "\t\t\tfactor which is set with --backoff.\n");
-   fprintf(stderr, "\n--interval=<n> or -i <n> Set minimum packet interval to <n> ms, default=%d.\n", interval);
+   fprintf(stderr, "\n--interval=<n> or -i <n> Set minimum packet interval to <n> ms, default=%d.\n", interval/1000);
    fprintf(stderr, "\t\t\tThis controls the outgoing bandwidth usage by limiting\n");
    fprintf(stderr, "\t\t\tthe rate at which packets can be sent.  The packet\n");
    fprintf(stderr, "\t\t\tinterval will be greater than or equal to this number.\n");
