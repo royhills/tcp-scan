@@ -1,7 +1,7 @@
 # $Id$
 # Process this file with automake to produce Makefile.in
 #
-bin_PROGRAMS = sql-slammer-scan dns-scan
+bin_PROGRAMS = sql-slammer-scan dns-scan snmp-scan
 #
 sql_slammer_scan_SOURCES = udp-scan-engine.c udp-scan-engine.h sql-slammer-scan.c sql-slammer-scan.h error.c
 sql_slammer_scan_LDADD = @COMPAT_OBJS@
@@ -12,3 +12,8 @@ dns_scan_SOURCES = udp-scan-engine.c udp-scan-engine.h dns-scan.c dns-scan.h err
 dns_scan_LDADD = @COMPAT_OBJS@ -lresolv /usr/lib/libresolv.a
 dns_scan_DEPENDENCIES = @COMPAT_OBJS@
 EXTRA_dns_scan_SOURCES = getopt.c getopt.h getopt1.c
+#
+snmp_scan_SOURCES = udp-scan-engine.c udp-scan-engine.h snmp-scan.c snmp-scan.h error.c
+snmp_scan_LDADD = @COMPAT_OBJS@
+snmp_scan_DEPENDENCIES = @COMPAT_OBJS@
+EXTRA_snmp_scan_SOURCES = getopt.c getopt.h getopt1.c
