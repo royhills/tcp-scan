@@ -119,7 +119,8 @@ void remove_host(struct host_entry *);
 void timeval_diff(struct timeval *, struct timeval *, struct timeval *);
 struct host_entry *find_host(struct host_entry *, struct in_addr *,
                              unsigned char *, int);
-void display_packet(int, char *, struct host_entry *, struct in_addr *);
+void display_packet(int, unsigned char *, struct host_entry *,
+                    struct in_addr *);
 void advance_cursor(void);
 void dump_list(void);
 void print_times(void);
