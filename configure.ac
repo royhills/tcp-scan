@@ -1,8 +1,14 @@
 dnl $Id$
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT(sql-slammer-scan.c)
-AM_INIT_AUTOMAKE(sql-slammer-scan, 1.1, nodefine)
+AC_INIT(sql-slammer-scan, 1.2, [sql-slammer-scan@nta-monitor.com])
+AC_CONFIG_SRCDIR([sql-slammer-scan.c])
+dnl If I don't pass $PACKAGE_NAME and $PACKAGE_VERSION to AM_INIT_AUTOMAKE,
+dnl then PACKAGE and VERSION are not defined and these are required for
+dnl make dist.  The documentation implies that I shouldn't need to
+dnl supply these arguments, but I find that I do need to with autoconf 2.53 and
+dnl automake 1.4.
+AM_INIT_AUTOMAKE($PACKAGE_NAME, $PACKAGE_VERSION)
 
 AM_CONFIG_HEADER(config.h)
 
@@ -42,12 +48,20 @@ AC_NTA_CHECK_TYPE(uint32_t, unsigned int)
 dnl Checks for library functions.
 AC_CHECK_FUNCS([malloc gethostbyname gettimeofday inet_ntoa memset select socket strerror])
 
+dnl Determine type for 3rd arg to accept()
+dnl This is normally socklen_t, but can sometimes be size_t or int.
+AC_NTA_NET_SIZE_T
+
 dnl GNU systems e.g. Linux have getopt_long_only, but many other systems
 dnl e.g. FreeBSD 4.3 and Solaris 8 do not.  For systems that don't have it,
 dnl we compile the GNU getopt sources (obtained from glibc) and link with the
 dnl resultant objects.
+dnl
+dnl We should be able to use AC_LIBOBJ here, but I've not been able to get
+dnl that to work with automake 1.4 and autoconf 2.53.
 AC_CHECK_FUNC(getopt_long_only, ,
   [ COMPAT_SRCS="$COMPAT_SRCS getopt.c getopt1.c"
     COMPAT_OBJS="$COMPAT_OBJS getopt.o getopt1.o" ])
 
-AC_OUTPUT(Makefile)
+AC_CONFIG_FILES([Makefile])
+AC_OUTPUT
