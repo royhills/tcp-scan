@@ -114,11 +114,15 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
  *	Set msg to the IP address of the host entry, plus the address of the
  *	responder if different, and a tab.
  */
-   msg = make_message("%s\t", my_ntoa(he->addr));
-   if ((he->addr).v4.s_addr != recv_addr->s_addr) {	/* XXXX */
-      cp = msg;
-      msg = make_message("%s(%s) ", cp, inet_ntoa(*recv_addr));
-      free(cp);
+   if (he) {
+      msg = make_message("%s\t", my_ntoa(he->addr));
+      if ((he->addr).v4.s_addr != recv_addr->s_addr) {
+         cp = msg;
+         msg = make_message("%s(%s) ", cp, inet_ntoa(*recv_addr));
+         free(cp);
+      }
+   } else {
+      msg = make_message("%s\t(*) ", inet_ntoa(*recv_addr));
    }
 /*
  *	Check that the packet is large enough to decode.
@@ -196,7 +200,7 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
 /*
  *	If the host entry is not live, then flag this as a duplicate.
  */
-      if (!he->live) {
+      if (he && !he->live) {
          cp = msg;
          msg = make_message("%s (DUP: %u)", cp, he->num_recv);
          free(cp);
@@ -462,6 +466,9 @@ initialise(void) {
          warn_msg("pcap filter string: %s", filter_string);
          free(filter_string);
          break;
+      default:
+         err_msg("Unsupported ICMP packet type: %u", icmp_packet_type);
+         break;
    }
    if ((pcap_setfilter(handle, &filter)) < 0)
       err_msg("pcap_setfilter: %s\n", pcap_geterr(handle));
@@ -559,6 +566,11 @@ local_help(void) {
    fprintf(stderr, "\t\t\tThis sets the TOS value in the IP header for outbound\n");
    fprintf(stderr, "\t\t\tpackets.\n");
    fprintf(stderr, "\n--icmptype=<n> or -T <n> Set ICMP type to <n>. Default=%d\n", DEFAULT_ICMP_TYPE);
+   fprintf(stderr, "\t\t\tSupported values are:\n");
+   fprintf(stderr, "\t\t\t 8 - Echo Request (Ping)\n");
+   fprintf(stderr, "\t\t\t13 - Timestamp Request\n");
+   fprintf(stderr, "\t\t\t15 - Information Request\n");
+   fprintf(stderr, "\t\t\t17 - Address Mask Request\n");
 }
 
 /*
@@ -880,10 +892,8 @@ callback(u_char *args, const struct pcap_pkthdr *header,
    } else {
 /*
  *	The received packet is not from an IP address in the list
- *	Issue a message to that effect and ignore the packet.
  */
-      if (verbose)
-         warn_msg("---\tIgnoring %d bytes from unknown host %s", n, inet_ntoa(source_ip));
+      display_packet(n, packet_in, NULL, &source_ip);
    }
 }
 
