@@ -42,10 +42,6 @@
 
 /* Structures */
 
-struct tcp_data {
-   uint16_t dport;	/* Destination port */
-};
-
 struct port_entry {
    struct port_entry *next;
    uint16_t port;
