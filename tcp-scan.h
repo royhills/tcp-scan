@@ -15,7 +15,7 @@
 
 /* Includes */
 #include <netinet/ip.h>
-#include <netinet/tcp.h>
+#include "tcp.h"
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <sys/utsname.h>
@@ -34,6 +34,7 @@
 #define PROMISC 0			/* Enable promiscuous mode */
 #define TO_MS 0				/* Timeout for pcap_open_live() */
 #define OPTIMISE 1			/* Optimise pcap filter */
+#define DEFAULT_WINDOW 5840		/* TCP Window */
 
 /* Structures */
 
