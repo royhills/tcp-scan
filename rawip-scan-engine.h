@@ -132,6 +132,7 @@ void local_help(void);
 int local_add_host(char *, unsigned);
 int local_find_host(struct host_entry **, struct host_entry *,
                     struct in_addr *, unsigned char *, int);
+char *make_message(const char *, ...);
 /* Wrappers */
 int Gettimeofday(struct timeval *);
 void *Malloc(size_t);
