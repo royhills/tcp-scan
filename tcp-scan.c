@@ -827,13 +827,9 @@ local_help(void) {
 int
 local_add_host(char *name, unsigned timeout) {
    static int first_time_through=1;
-   static char *port_spec;	/* TCP port specification */
    char *cp;
 
    if (first_time_through) {
-      char *p1;
-      char *p2;
-
       if (local_data == NULL && port_list == NULL) {
          warn_msg("You must specify the TCP dest ports with either the --data option");
          err_msg("or with the --servicefile option.");
@@ -842,20 +838,6 @@ local_add_host(char *name, unsigned timeout) {
       if (local_data && port_list) {
          err_msg("You cannot specify both the --data and --servicefile options.");
       }
-/*
- *	Copy local_data to port_spec, omitting all whitespace.
- */
-      if (local_data) {
-         port_spec = Malloc(strlen(local_data) + 1);
-         p1 = local_data;
-         p2 = port_spec;
-         while (*p1 != '\0') {
-            if (!isspace(*p1))
-               *p2++=*p1;
-            p1++;
-         }
-         *p2 = '\0';
-      }
       first_time_through=0;
    }
    if (local_data) {	/* --data option specified */
@@ -863,7 +845,7 @@ local_add_host(char *name, unsigned timeout) {
  *	Determine the ports in the port spec, and add a host entry for
  *	each one.
  */
-      cp = port_spec;
+      cp = local_data;
       while (*cp != '\0') {
          unsigned port1;
          unsigned port2;
@@ -871,22 +853,23 @@ local_add_host(char *name, unsigned timeout) {
    
          port1=strtoul(cp, &cp, 10);
          if (!port1 || (port1 & 0x80000000))	/* Zero or -ve */
-            err_msg("Invalid port specification: %s", port_spec);
+            err_msg("Invalid port specification: %s", local_data);
          if (*cp == ',' || *cp == '\0') {	/* Single port specification */
             add_host_port(name, timeout, port1);
          } else if (*cp == '-') {		/* Inclusive range */
             cp++;
             port2=strtoul(cp, &cp, 10);
             if (!port2 || port2 <= port1)	/* Missing end or empty range */
-               err_msg("Invalid port specification: %s", port_spec);
+               err_msg("Invalid port specification: %s", local_data);
             for (i=port1; i<=port2; i++)
                add_host_port(name, timeout, i);
          } else {
-            err_msg("Invalid port specification: %s", port_spec);
+            err_msg("Invalid port specification: %s", local_data);
          }
          if (*cp == ',')
             cp++;  /* Move on to next entry */
       }
+      free(local_data);
    } else {	/* --servicefile option specified */
 /*
  *	Add a host entry for each port in the port list.
@@ -897,6 +880,7 @@ local_add_host(char *name, unsigned timeout) {
          add_host_port(name, timeout, pe->port);
          pe = pe->next;
       }
+      free_port_list();
    }
 
    return 1;	/* Replace generic add_host() function */
@@ -914,8 +898,7 @@ add_host_port(char *name, unsigned timeout, unsigned port) {
    if ((hp = gethostbyname(name)) == NULL)
       err_sys("gethostbyname failed for \"%s\"", name);
 
-   if ((he = malloc(sizeof(struct host_entry))) == NULL)
-      err_sys("malloc");
+   he = Malloc(sizeof(struct host_entry));
 
    num_hosts++;
 
@@ -1239,6 +1222,9 @@ local_process_options(int argc, char *argv[]) {
 
    while ((arg=getopt_long_only(argc, argv, short_options, long_options, &options_index)) != -1) {
       switch (arg) {
+         char *p1;
+         char *p2;
+
          case 'f':	/* --file */
             strncpy(filename, optarg, MAXLINE);
             filename_flag=1;
@@ -1273,7 +1259,14 @@ local_process_options(int argc, char *argv[]) {
             break;
          case 'D':	/* --data */
             local_data = Malloc(strlen(optarg)+1);
-            strcpy(local_data, optarg);
+            p1 = optarg;
+            p2 = local_data;
+            while (*p1 != '\0') {
+               if (!isspace(*p1))
+                  *p2++=*p1;
+               p1++;
+            }
+            *p2 = '\0';
             break;
          case 's':	/* --sport */
             source_port=strtoul(optarg, (char **)NULL, 0);
