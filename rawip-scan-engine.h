@@ -90,6 +90,7 @@
 #define MAXIP 65515			/* Max IP data size = 64k - 20 */
 #define SYSLOG 1			/* Use syslog if defined */
 #define SYSLOG_FACILITY LOG_USER	/* Syslog facility to use */
+#define REALLOC_COUNT 1000		/* Entries to realloc at once */
 
 /* Structures */
 struct host_entry {
