@@ -32,7 +32,7 @@ unsigned timeout = DEFAULT_TIMEOUT;	/* Per-host timeout */
 float backoff_factor = DEFAULT_BACKOFF_FACTOR;	/* Backoff factor */
 int source_port = DEFAULT_SOURCE_PORT;	/* UDP source port */
 char const scanner_name[] = "generic-udp-scan";
-char const scanner_version[] = "1.0";
+char const scanner_version[] = "1.1";
 unsigned data_len;
 unsigned char *udp_data;
 
@@ -76,16 +76,24 @@ display_packet(int n, char *packet_in, struct host_entry *he,
    *cp = '\0';
 /*
  *	We assume that any response is valid.
- *	Display IP address, packet length and packet data.
+ *	Display IP address, packet length and packet data (both as hex and
+ *	text).
  */
    cp = packet_in;
    printf("%sResponse: len=%d, data=",
              ip_str, n);
+   cp = packet_in;
    for (i=0; i<n; i++) {
       printf("%.2x", (unsigned char) *cp);
       cp++;
    }
-   printf("\n");
+   printf(" (");
+   cp = packet_in;
+   for (i=0; i<n; i++) {
+      printf("%c", isprint(*cp)?*cp:'.');
+      cp++;
+   }
+   printf(")\n");
 }
 
 /*
