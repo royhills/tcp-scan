@@ -37,6 +37,8 @@ int debug = 0;				/* Debug flag */
 char *local_data=NULL;			/* Local data for scanner */
 pcap_t *handle;
 int pcap_fd;				/* Pcap file descriptor */
+char filename[MAXLINE];
+int filename_flag=0;
 
 extern unsigned interval;		/* Desired interval between packets */
 extern char const scanner_name[];	/* Scanner Name */
@@ -48,26 +50,7 @@ extern int ip_protocol;			/* IP protocol */
 
 int
 main(int argc, char *argv[]) {
-   struct option long_options[] = {
-      {"file", required_argument, 0, 'f'},
-      {"help", no_argument, 0, 'h'},
-      {"protocol", required_argument, 0, 'p'},
-      {"retry", required_argument, 0, 'r'},
-      {"timeout", required_argument, 0, 't'},
-      {"interval", required_argument, 0, 'i'},
-      {"backoff", required_argument, 0, 'b'},
-      {"verbose", no_argument, 0, 'v'},
-      {"version", no_argument, 0, 'V'},
-      {"debug", no_argument, 0, 'd'},
-      {"data", required_argument, 0, 'D'},
-      {0, 0, 0, 0}
-   };
-   const char *short_options = "f:hp:r:t:i:b:vVdD:";
-   int arg;
    char arg_str[MAXLINE];	/* Args as string for syslog */
-   int options_index=0;
-   char filename[MAXLINE];
-   int filename_flag=0;
    int sockfd;			/* IP socket file descriptor */
    struct sockaddr_in sa_peer;
    struct timeval now;
@@ -78,6 +61,7 @@ main(int argc, char *argv[]) {
    unsigned select_timeout;	/* Select timeout */
    unsigned long long loop_timediff;	/* Time since last packet sent in us */
    unsigned long long host_timediff; /* Time since last pkt sent to this host (us) */
+   int arg;
    int arg_str_space;		/* Used to avoid buffer overruns when copying */
    struct timeval last_packet_time;	/* Time last packet was sent */
    int req_interval;		/* Requested per-packet interval */
@@ -113,55 +97,13 @@ main(int argc, char *argv[]) {
    info_syslog("Starting: %s", arg_str);
 #endif
 /*
+ *	Process options.
+ */
+   process_options(argc, argv);
+/*
  *	Get program start time for statistics displayed on completion.
  */
    Gettimeofday(&start_time);
-/*
- *	Process options and arguments.
- */
-   while ((arg=getopt_long_only(argc, argv, short_options, long_options, &options_index)) != -1) {
-      switch (arg) {
-         case 'f':	/* --file */
-            strncpy(filename, optarg, MAXLINE);
-            filename_flag=1;
-            break;
-         case 'h':	/* --help */
-            usage();
-            break;
-         case 'p':	/* --protocol */
-            ip_protocol=atoi(optarg);
-            break;
-         case 'r':	/* --retry */
-            retry=atoi(optarg);
-            break;
-         case 't':	/* --timeout */
-            timeout=atoi(optarg);
-            break;
-         case 'i':	/* --interval */
-            interval=atoi(optarg);
-            break;
-         case 'b':	/* --backoff */
-            backoff_factor=atof(optarg);
-            break;
-         case 'v':	/* --verbose */
-            verbose++;
-            break;
-         case 'V':	/* --version */
-            rawip_scan_version();
-            exit(0);
-            break;
-         case 'd':	/* --debug */
-            debug++;
-            break;
-         case 'D':	/* --data */
-            local_data = Malloc(strlen(optarg)+1);
-            strcpy(local_data, optarg);
-            break;
-         default:	/* Unknown option */
-            usage();
-            break;
-      }
-   }
    if (debug) {print_times(); printf("main: Start\n");}
 /*
  *	Call protocol-specific initialisation routine to perform any
@@ -753,10 +695,10 @@ make_message(const char *fmt, ...) {
  *      free'ed by the caller when it's no longer needed.
  */
 char *
-printable(unsigned char *string, size_t size) {
+printable(const unsigned char *string, size_t size) {
    char *result;
    char *r;
-   unsigned char *cp;
+   const unsigned char *cp;
    size_t outlen;
    unsigned i;
 /*
@@ -840,6 +782,88 @@ printable(unsigned char *string, size_t size) {
    return result;
 }
 
+/*
+ *	process_options	--	Process options and arguments.
+ *
+ *	Inputs:
+ *
+ *	argc	Command line arg count
+ *	argv	Command line args
+ *
+ *	Returns:
+ *
+ *	None.
+ */
+void
+process_options(int argc, char *argv[]) {
+   struct option long_options[] = {
+      {"file", required_argument, 0, 'f'},
+      {"help", no_argument, 0, 'h'},
+      {"protocol", required_argument, 0, 'p'},
+      {"retry", required_argument, 0, 'r'},
+      {"timeout", required_argument, 0, 't'},
+      {"interval", required_argument, 0, 'i'},
+      {"backoff", required_argument, 0, 'b'},
+      {"verbose", no_argument, 0, 'v'},
+      {"version", no_argument, 0, 'V'},
+      {"debug", no_argument, 0, 'd'},
+      {"data", required_argument, 0, 'D'},
+      {0, 0, 0, 0}
+   };
+   const char *short_options = "f:hp:r:t:i:b:vVdD:";
+   int arg;
+   int options_index=0;
+/*
+ * Return immediately if the local process_options function replaces this
+ * generic one.
+ */
+   if (local_process_options(argc, argv))
+      return;
+
+   while ((arg=getopt_long_only(argc, argv, short_options, long_options, &options_index)) != -1) {
+      switch (arg) {
+         case 'f':	/* --file */
+            strncpy(filename, optarg, MAXLINE);
+            filename_flag=1;
+            break;
+         case 'h':	/* --help */
+            usage();
+            break;
+         case 'p':	/* --protocol */
+            ip_protocol=atoi(optarg);
+            break;
+         case 'r':	/* --retry */
+            retry=atoi(optarg);
+            break;
+         case 't':	/* --timeout */
+            timeout=atoi(optarg);
+            break;
+         case 'i':	/* --interval */
+            interval=atoi(optarg);
+            break;
+         case 'b':	/* --backoff */
+            backoff_factor=atof(optarg);
+            break;
+         case 'v':	/* --verbose */
+            verbose++;
+            break;
+         case 'V':	/* --version */
+            rawip_scan_version();
+            exit(0);
+            break;
+         case 'd':	/* --debug */
+            debug++;
+            break;
+         case 'D':	/* --data */
+            local_data = Malloc(strlen(optarg)+1);
+            strcpy(local_data, optarg);
+            break;
+         default:	/* Unknown option */
+            usage();
+            break;
+      }
+   }
+}
 
 /*
  *	rawip_scan_version -- display version information
