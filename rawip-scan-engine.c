@@ -42,6 +42,7 @@ char filename[MAXLINE];
 int filename_flag=0;
 int random_flag=0;			/* Randomise the list */
 int numeric_flag=0;			/* IP addresses only */
+int ipv6_flag=0;			/* IPv6 */
 
 extern unsigned interval;		/* Desired interval between packets */
 extern char const scanner_name[];	/* Scanner Name */
@@ -51,6 +52,8 @@ extern unsigned timeout;		/* Per-host timeout */
 extern float backoff_factor;		/* Backoff factor */
 extern int ip_protocol;			/* IP protocol */
 
+static char *ga_err_msg;		/* getaddrinfo error message */
+
 int
 main(int argc, char *argv[]) {
    char arg_str[MAXLINE];	/* Args as string for syslog */
@@ -59,7 +62,7 @@ main(int argc, char *argv[]) {
    struct timeval now;
    unsigned char packet_in[MAXIP];	/* Received packet */
    char namebuf[MAXLINE];
-   struct hostent *hp;
+   ip_address *hp;
    struct timeval diff;		/* Difference between two timevals */
    unsigned select_timeout;	/* Select timeout */
    unsigned long long loop_timediff;	/* Time since last packet sent in us */
@@ -121,6 +124,8 @@ main(int argc, char *argv[]) {
       err_sys("socket");
    if ((setsockopt(sockfd, IPPROTO_IP, IP_HDRINCL, &on, sizeof(on))) != 0)
       err_sys("setsockopt");
+   if ((setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &on, sizeof(on))) != 0)
+      err_sys("setsockopt");
 /*
  *	Drop privileges.
  */
@@ -132,7 +137,7 @@ main(int argc, char *argv[]) {
  *	given as command line arguments.
  */
    sprintf(namebuf, "%s-target.test.nta-monitor.com", scanner_name);
-   hp = gethostbyname(namebuf);
+   hp = get_host_address(namebuf, AF_INET, NULL, &ga_err_msg);
    if (!filename_flag) 
       if ((argc - optind) < 1)
          usage();
@@ -278,7 +283,7 @@ main(int argc, char *argv[]) {
             }
             if ((*cursor)->num_sent >= retry) {
                if (verbose > 1)
-                  warn_msg("---\tRemoving host entry %u (%s) - Timeout", (*cursor)->n, inet_ntoa((*cursor)->addr));
+                  warn_msg("---\tRemoving host entry %u (%s) - Timeout", (*cursor)->n, my_ntoa((*cursor)->addr));
                if (debug) {print_times(); printf("main: Timing out host %d.\n", (*cursor)->n);}
                remove_host(cursor);	/* Automatically calls advance_cursor() */
                if (first_timeout) {
@@ -287,7 +292,7 @@ main(int argc, char *argv[]) {
                   while (host_timediff >= (*cursor)->timeout && live_count) {
                      if ((*cursor)->live) {
                         if (verbose > 1)
-                           warn_msg("---\tRemoving host %u (%s) - Catch-Up Timeout", (*cursor)->n, inet_ntoa((*cursor)->addr));
+                           warn_msg("---\tRemoving host %u (%s) - Catch-Up Timeout", (*cursor)->n, my_ntoa((*cursor)->addr));
                         remove_host(cursor);
                      } else {
                         advance_cursor();
@@ -362,11 +367,12 @@ main(int argc, char *argv[]) {
  */
 void
 add_host(char *name, unsigned timeout) {
-   struct hostent *hp=NULL;
-   struct in_addr inp;
+   ip_address *hp=NULL;
+   ip_address addr;
    struct host_entry *he;
    struct timeval now;
    static int num_left=0;	/* Number of free entries left */
+   int result;
 /*
  * Return immediately if the local add_host function replaces this generic one.
  */
@@ -374,11 +380,21 @@ add_host(char *name, unsigned timeout) {
       return;
 
    if (numeric_flag) {
-      if (!(inet_aton(name, &inp)))
-         err_sys("inet_aton failed for \"%s\"", name);
+      if (ipv6_flag) {
+         result = inet_pton(AF_INET6, name, &(addr.v6));
+      } else {
+         result = inet_pton(AF_INET, name, &(addr.v4));
+      }
+      if (result <= 0)
+         err_sys("inet_pton failed for \"%s\"", name);
    } else {
-      if ((hp = gethostbyname(name)) == NULL)
-         err_sys("gethostbyname failed for \"%s\"", name);
+      if (ipv6_flag) {
+         hp = get_host_address(name, AF_INET6, &addr, &ga_err_msg);
+      } else {
+         hp = get_host_address(name, AF_INET, &addr, &ga_err_msg);
+      }
+      if (hp == NULL)
+         err_msg("get_host_address failed for \"%s\": %s", name, ga_err_msg);
    }
 
    if (!num_left) {	/* No entries left, allocate some more */
@@ -397,10 +413,11 @@ add_host(char *name, unsigned timeout) {
    Gettimeofday(&now);
 
    he->n = num_hosts;
-   if (numeric_flag)
-      memcpy(&(he->addr), &inp, sizeof(struct in_addr));
-   else
-      memcpy(&(he->addr), hp->h_addr_list[0], sizeof(struct in_addr));
+   if (ipv6_flag) {
+      memcpy(&(he->addr.v6), &(addr.v6), sizeof(struct in6_addr));
+   } else {
+      memcpy(&(he->addr.v4), &(addr.v4), sizeof(struct in_addr));
+   }
    he->live = 1;
    he->timeout = timeout * 1000;	/* Convert from ms to us */
    he->num_sent = 0;
@@ -495,7 +512,7 @@ find_host(struct host_entry **he, struct in_addr *addr,
 
    do {
       iterations++;
-      if ((*p)->addr.s_addr == addr->s_addr) {
+      if ((*p)->addr.v4.s_addr == addr->s_addr) {
          found = 1;
       } else {
          if (p == helistptr) {
@@ -594,7 +611,7 @@ dump_list(void) {
    printf("Host List:\n\n");
    printf("Entry\tIP Address\n");
    for (i=0; i<num_hosts; i++)
-      printf("%u\t%s\n", helistptr[i]->n, inet_ntoa(helistptr[i]->addr));
+      printf("%u\t%s\n", helistptr[i]->n, my_ntoa(helistptr[i]->addr));
    printf("\nTotal of %u host entries.\n\n", num_hosts);
 }
 
@@ -655,6 +672,7 @@ usage(void) {
    fprintf(stderr, "\n--numeric or -N\t\tIP addresses only, no hostnames.\n");
    fprintf(stderr, "\t\t\tWith this option, all hosts must be specified as\n");
    fprintf(stderr, "\t\t\tIP addresses.  Hostnames are not permitted.\n");
+   fprintf(stderr, "\n--ipv6 or -6\t\tUse IPv6 protocol. Default is IPv4.\n");
 /* Call scanner-specific help function */
    local_help();
    fprintf(stderr, "\n");
@@ -875,9 +893,10 @@ process_options(int argc, char *argv[]) {
       {"data", required_argument, 0, 'D'},
       {"random", no_argument, 0, 'R'},
       {"numeric", no_argument, 0, 'N'},
+      {"ipv6", no_argument, 0, '6'},
       {0, 0, 0, 0}
    };
-   const char *short_options = "f:hp:r:t:i:b:vVdD:N";
+   const char *short_options = "f:hp:r:t:i:b:vVdD:N6";
    int arg;
    int options_index=0;
 /*
@@ -931,6 +950,9 @@ process_options(int argc, char *argv[]) {
          case 'N':	/* --numeric */
             numeric_flag=1;
             break;
+         case '6':      /* --ipv6 */
+            ipv6_flag=1;
+            break;
          default:	/* Unknown option */
             usage();
             break;
@@ -958,4 +980,88 @@ rawip_scan_version (void) {
    fprintf(stderr, "%s\n", rcsid);
 /* Call scanner-specific version routine */
    local_version();
+}
+
+/*
+ *	get_host_address -- Obtain target host IP address
+ *
+ *	Inputs:
+ *
+ *	name		The name to lookup
+ *	af		The address family.  Either AF_INET or AF_INET6
+ *	addr		Pointer to the IP address buffer
+ *	error_msg	The error message, or NULL if no problem.
+ *
+ *	Returns:
+ *
+ *	Pointer to the IP address, or NULL if an error ocurred.
+ *
+ *	This function is basically a wrapper for getaddrinfo().
+ */
+ip_address *
+get_host_address(const char *name, int af, ip_address *addr, char **error_msg) {
+   static char err[MAXLINE];
+   static ip_address ipa;
+
+   struct addrinfo *res;
+   struct addrinfo hints;
+   struct sockaddr_in sa_in;
+   struct sockaddr_in6 sa_in6;
+   int result;
+
+   if (addr == NULL)	/* Use static storage if no buffer specified */
+      addr = &ipa;
+
+   memset(&hints, '\0', sizeof(hints));
+   if (af == AF_INET) {
+      hints.ai_family = AF_INET;
+   } else if (af == AF_INET6) {
+      hints.ai_family = AF_INET6;
+   } else {
+      err_msg("get_host_address: unknown address family: %d", af);
+   }
+
+   result = getaddrinfo(name, NULL, &hints, &res);
+   if (result != 0) {	/* Error occurred */
+      snprintf(err, MAXLINE, "%s", gai_strerror(result));
+      *error_msg = err;
+      return NULL;
+   }
+
+   if (af == AF_INET) {
+      memcpy(&sa_in, res->ai_addr, sizeof(sa_in));
+      memcpy(&(addr->v4), &sa_in.sin_addr, sizeof(struct in_addr));
+   } else {	/* Must be AF_INET6 */
+      memcpy(&sa_in6, res->ai_addr, sizeof(sa_in6));
+      memcpy(&(addr->v6), &sa_in6.sin6_addr, sizeof(struct in6_addr));
+   }
+
+   freeaddrinfo(res);
+
+   *error_msg = NULL;
+   return addr;
+}
+
+/*
+ *	my_ntoa -- IPv6 compatible inet_ntoa replacement
+ *
+ *	Inputs:
+ *
+ *	addr	The IP address (either IPv4 or IPv6)
+ *
+ *	Returns:
+ *
+ *	Pointer to the string representation of the IP address.
+ */
+const char *
+my_ntoa(ip_address addr) {
+   static char ip_str[MAXLINE];
+   const char *cp;
+
+   if (ipv6_flag)
+      cp = inet_ntop(AF_INET6, &addr.v6, ip_str, MAXLINE);
+   else
+      cp = inet_ntop(AF_INET, &addr.v4, ip_str, MAXLINE);
+
+   return cp;
 }
