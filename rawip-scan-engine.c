@@ -382,7 +382,8 @@ remove_host(struct host_entry *he) {
          advance_cursor();
       if (debug) {print_times(); printf("remove_host: live_count now %d\n", live_count);}
    } else {
-      warn_msg("***\tremove_host called on non-live host entry: SHOULDN'T HAPPEN");
+      if (verbose > 1)
+         warn_msg("***\tremove_host called on non-live host entry: SHOULDN'T HAPPEN");
    }
 }
 
