@@ -19,7 +19,7 @@
 #include <net/if.h>
 #include <sys/utsname.h>
 #include "md5.h"
-#include <netinet/ip_icmp.h>
+#include "ip_icmp.h"
 
 /* Defines */
 
