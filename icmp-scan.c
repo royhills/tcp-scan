@@ -94,7 +94,7 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
    char *df;
    static const id_name_map icmp_type_map[] = {
       {0, "Echo_Reply"},
-      {3, "Destination_Unreachable"},
+      {3, "Unreachable"},
       {4, "Source_Quench"},
       {5, "Redirect"},
       {8, "Echo_Request"},
@@ -108,6 +108,25 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
       {16, "Information_Reply"},
       {17, "Address_Mask_Request"},
       {18, "Address_Mask_Reply"},
+      {-1, NULL}
+   };
+   static const id_name_map icmp_code3_map[] = {
+      {0, "Network_Unreachable"},
+      {1, "Host_Unreachable"},
+      {2, "Protocol_Unreachable"},
+      {3, "Port_Unreachable"},
+      {4, "Frag_Needed_DF_Set"},
+      {5, "Source_Route_Failed"},
+      {6, "Network_Unknown"},
+      {7, "Host_Unknown"},
+      {8, "Host_Isolated"},
+      {9, "Net_Admin_Prohibited"},
+      {10, "Host_Admin_Prohibited"},
+      {11, "Net_Unreachable_TOS"},
+      {12, "Host_Unreachable_TOS"},
+      {13, "Admin_Filter"},
+      {14, "Host_Precedence_Violation"},
+      {15, "Precedence_Cutoff"},
       {-1, NULL}
    };
 /*
@@ -146,7 +165,10 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
  *	Determine type of response and add to message.
  */
    cp = msg;
-   msg = make_message("%s%s", cp, id_to_name(icmph->type, icmp_type_map));
+   if (icmph->type == 3)	/* Use seperate map for unreachable */
+      msg = make_message("%s%s", cp, id_to_name(icmph->code, icmp_code3_map));
+   else
+      msg = make_message("%s%s", cp, id_to_name(icmph->type, icmp_type_map));
    free(cp);
    if (!quiet_flag) {
 /*
@@ -183,7 +205,7 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
             break;
          case 18:
             cp = msg;
-            msg = make_message("%s icmp_id=%u, icmp_seq=%u, mask=%u",
+            msg = make_message("%s icmp_id=%u, icmp_seq=%u, mask=%.8x",
                                cp, ntohs(icmph->un.mask.id),
                                ntohs(icmph->un.mask.sequence),
                                ntohl(icmph->un.mask.mask));
@@ -270,6 +292,7 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
       unsigned long tsorig;
 
       case 8:
+      case 32:	/* Proto unreach uses ICMP Echo payload */
          icmph->type = 8;
          icmph->code = 0;
          icmph->un.echo.id = htons(icmp_id_no);
@@ -466,6 +489,16 @@ initialise(void) {
          warn_msg("pcap filter string: %s", filter_string);
          free(filter_string);
          break;
+      case 32:
+         filter_string=make_message("icmp[0:1]=3 and icmp[1:1]=2 and dst host %s and icmp[32:2]=%u and icmp[34:2]=%u",
+                                    my_ntoa(local_address), icmp_id_no,
+                                    icmp_seq_no);
+         if ((pcap_compile(handle,&filter,filter_string,OPTIMISE,netmask)) < 0)
+            err_msg("pcap_geterr: %s\n", pcap_geterr(handle));
+         warn_msg("pcap filter string: %s", filter_string);
+         free(filter_string);
+         ip_protocol = UNREACH_PROTO;	/* value to cause proto unreach */
+         break;
       default:
          err_msg("Unsupported ICMP packet type: %u", icmp_packet_type);
          break;
@@ -571,6 +604,7 @@ local_help(void) {
    fprintf(stderr, "\t\t\t13 - Timestamp Request\n");
    fprintf(stderr, "\t\t\t15 - Information Request\n");
    fprintf(stderr, "\t\t\t17 - Address Mask Request\n");
+   fprintf(stderr, "\t\t\t32 - Protocol Unreachable (type 3, code 2)\n");
 }
 
 /*
