@@ -37,6 +37,9 @@ int source_port_flag=0;
 uint16_t window=DEFAULT_WINDOW;		/* TCP Window size */
 uint16_t mss=DEFAULT_MSS;		/* TCP MSS. 0=Don't use MSS option */
 int open_only=0;			/* Only show open ports? */
+int wscale_flag=0;			/* Add wscale=0 TCP option? */
+int sack_flag=0;			/* Add SACKOK TCP option? */
+int timestamp_flag=0;			/* Add TIMESTAMP TCP option? */
 char const scanner_name[] = "tcp-scan";
 char const scanner_version[] = "1.4";
 
@@ -275,6 +278,40 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
                   options = make_message("MSS=%u", ntohs(*sptr));
                }
                break;
+            case TCPOPT_WINDOW:
+               uc = *(optptr+2);
+               optlen -= 3;
+               optptr += 3;
+               if (options) {
+                  cp = options;
+                  options = make_message("%s,WSCALE=%u", cp, uc);
+                  free(cp);
+               } else {
+                  options = make_message("WSCALE=%u", uc);
+               }
+               break;
+            case TCPOPT_SACK_PERMITTED:
+               optlen -= 2;
+               optptr += 2;
+               if (options) {
+                  cp = options;
+                  options = make_message("%s,SACKOK", cp);
+                  free(cp);
+               } else {
+                  options = make_message("SACKOK");
+               }
+               break;
+            case TCPOPT_TIMESTAMP:
+               optlen -= 10;
+               optptr += 10;
+               if (options) {
+                  cp = options;
+                  options = make_message("%s,TIMESTAMP", cp);
+                  free(cp);
+               } else {
+                  options = make_message("TIMESTAMP");
+               }
+               break;
             default:
                uc = *optptr;
                if (options) {
@@ -365,6 +402,7 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    sizeof(struct pseudo_hdr));
    unsigned char *options = (unsigned char *) (buf + sizeof(struct iphdr) +
                                               sizeof(struct tcphdr));
+   unsigned char *optptr;
    size_t options_len=0;
 /*
  *	Check that the host is live.  Complain if not.
@@ -384,12 +422,38 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
  *	Add TCP options.  We do this before the TCP header because the
  *	options must be covered by the TCP checksum calculation.
  */
+   optptr = options;
    if (mss) {
+      *optptr++ = 2;		/* Kind=2 (MSS) */
+      *optptr++ = 4;		/* Len=4 Bytes */
+      *optptr++ = mss / 256;	/* MSS high byte */
+      *optptr++ = mss % 256;	/* MSS low byte */
       options_len += 4;
-      *options = 2;		/* Kind=2 (MSS) */
-      *(options+1) = 4;		/* Len=4 Bytes */
-      *(options+2) = mss / 256;	/* MSS high byte */
-      *(options+3) = mss % 256;	/* MSS low byte */
+   }
+   if (wscale_flag) {
+      *optptr++ = 1;		/* Kind=1 (NOP) - pad */
+      *optptr++ = 3;		/* Kind=3 (WSCALE) */
+      *optptr++ = 3;		/* Len=3 bytes */
+      *optptr++ = 0;		/* Value=0 */
+      options_len += 4;
+   }
+   if (sack_flag) {
+      *optptr++ = 4;		/* Kind=4 (SACKOK) */
+      *optptr++ = 2;		/* Len=2 bytes */
+      options_len += 2;
+   }
+   if (timestamp_flag) {
+      *optptr++ = 8;		/* Kind=8 (TIMESTAMP) */
+      *optptr++ = 10;		/* Len=10 bytes */
+      *optptr++ = 0xde;		/* TS Value */
+      *optptr++ = 0xad;
+      *optptr++ = 0xbe;
+      *optptr++ = 0xef;
+      *optptr++ = 0;		/* TS Echo Reply */
+      *optptr++ = 0;
+      *optptr++ = 0;
+      *optptr++ = 0;
+      options_len += 10;
    }
 /*
  *	Construct the pseudo header (for TCP checksum purposes).
@@ -629,7 +693,17 @@ local_help(void) {
    fprintf(stderr, "\t\t\tIf this option is specified, then the TCP ports to\n");
    fprintf(stderr, "\t\t\tscan are read from the specified file.  The file is\n");
    fprintf(stderr, "\t\t\tsame format as used by \"strobe\".\n");
-   fprintf(stderr, "\n--mss=<n> or -m <n>\tUse TCP MSS <n>.\n");
+   fprintf(stderr, "\n--mss=<n> or -m <n>\tUse TCP MSS <n>.  Default is %u\n",
+           DEFAULT_MSS);
+   fprintf(stderr, "\t\t\tA non-zero MSS adds the MSS TCP option to the SYN packet\n");
+   fprintf(stderr, "\t\t\twhich adds 4 bytes to the packet length.  If the MSS\n");
+   fprintf(stderr, "\t\t\tis specified as zero, then no MSS option is added.\n");
+   fprintf(stderr, "\n--wscale or -W\t\tAdd the WSCALE TCP option\n");
+   fprintf(stderr, "\t\t\tThis option adds 4 bytes to the packet length.\n");
+   fprintf(stderr, "\n--sack or -a\t\tAdd the SACKOK TCP option\n");
+   fprintf(stderr, "\t\t\tThis option adds 2 bytes to the packet length.\n");
+   fprintf(stderr, "\n--timestamp or -T\tAdd the TIMESTAMP TCP option\n");
+   fprintf(stderr, "\t\t\tThis option adds 10 bytes to the packet length.\n");
 }
 
 /*
@@ -1053,9 +1127,12 @@ local_process_options(int argc, char *argv[]) {
       {"openonly", no_argument, 0, 'o'},
       {"servicefile", required_argument, 0, 'S'},
       {"mss", required_argument, 0, 'm'},
+      {"wscale", no_argument, 0, 'W'},
+      {"sack", no_argument, 0, 'a'},
+      {"timestamp", no_argument, 0, 'T'},
       {0, 0, 0, 0}
    };
-   const char *short_options = "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:";
+   const char *short_options = "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:WaT";
    int arg;
    int options_index=0;
 
@@ -1116,6 +1193,15 @@ local_process_options(int argc, char *argv[]) {
             break;
          case 'm':	/* --mss */
             mss=strtoul(optarg, (char **)NULL, 0);
+            break;
+         case 'W':	/* --wscale */
+            wscale_flag=1;
+            break;
+         case 'a':	/* --sack */
+            sack_flag=1;
+            break;
+         case 'T':	/* --timestamp */
+            timestamp_flag=1;
             break;
          default:	/* Unknown option */
             usage();
