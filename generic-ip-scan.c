@@ -19,22 +19,20 @@
  * 
  */
 
-#include "udp-scan-engine.h"
-#include "generic-udp-scan.h"
+#include "rawip-scan-engine.h"
+#include "generic-ip-scan.h"
 
 static char const rcsid[] = "$Id$";   /* RCS ID for ident(1) */
 
 /* Global variables */
-int dest_port=DEFAULT_DEST_PORT;	/* UDP destination port */
 unsigned interval = DEFAULT_INTERVAL;	/* Interval between packets */
 unsigned retry = DEFAULT_RETRY;		/* Number of retries */
 unsigned timeout = DEFAULT_TIMEOUT;	/* Per-host timeout */
 float backoff_factor = DEFAULT_BACKOFF_FACTOR;	/* Backoff factor */
-int source_port = DEFAULT_SOURCE_PORT;	/* UDP source port */
-char const scanner_name[] = "generic-udp-scan";
-char const scanner_version[] = "1.1";
+char const scanner_name[] = "generic-ip-scan";
+char const scanner_version[] = "1.0";
 unsigned data_len;
-unsigned char *udp_data;
+unsigned char *rawip_data;
 
 extern int verbose;	/* Verbose level */
 extern int debug;	/* Debug flag */
@@ -101,7 +99,6 @@ display_packet(int n, char *packet_in, struct host_entry *he,
  *
  *	s		UDP socket file descriptor
  *	he		Host entry to send to
- *	dest_port	Destination UDP port
  *	last_packet_time	Time when last packet was sent
  *
  *      Returns:
@@ -109,11 +106,11 @@ display_packet(int n, char *packet_in, struct host_entry *he,
  *      None.
  *
  *      This must construct an appropriate packet and send it to the host
- *      identified by "he" and UDP port "dest_port" using the socket "s".
+ *      identified by "he" using the socket "s".
  *      It must also update the "last_send_time" field for this host entry.
  */
 void
-send_packet(int s, struct host_entry *he, int dest_port,
+send_packet(int s, struct host_entry *he,
             struct timeval *last_packet_time) {
    struct sockaddr_in sa_peer;
    char buf[MAXUDP];
@@ -132,9 +129,9 @@ send_packet(int s, struct host_entry *he, int dest_port,
          err_msg("Length of --data argument must be even (multiple of 2).");
       }
       data_len=strlen(local_data)/2;
-      if ((udp_data = malloc(data_len)) == NULL)
+      if ((rawip_data = malloc(data_len)) == NULL)
          err_sys("malloc");
-      cp = udp_data;
+      cp = rawip_data;
       for (i=0; i<data_len; i++)
          *cp++=hstr_i(&local_data[i*2]);
       first_time_through=0;
@@ -152,14 +149,13 @@ send_packet(int s, struct host_entry *he, int dest_port,
    memset(&sa_peer, '\0', sizeof(sa_peer));
    sa_peer.sin_family = AF_INET;
    sa_peer.sin_addr.s_addr = he->addr.s_addr;
-   sa_peer.sin_port = htons(dest_port);
    sa_peer_len = sizeof(sa_peer);
 /*
  *	Copy the required data into the output buffer "buf" and set "buflen"
  *	to the number of bytes in this buffer.
  */
    buflen=data_len;
-   memcpy(buf, udp_data, buflen);
+   memcpy(buf, rawip_data, buflen);
 /*
  *	Update the last send times for this host.
  */
