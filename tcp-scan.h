@@ -36,6 +36,7 @@
 #define OPTIMISE 1			/* Optimise pcap filter */
 #define DEFAULT_WINDOW 5840		/* TCP Window */
 #define DEFAULT_MSS 1460		/* TCP MSS */
+#define DEFAULT_TTL 64			/* IP TTL */
 
 /* Structures */
 
