@@ -1,24 +1,9 @@
 # $Id$
 # Process this file with automake to produce Makefile.in
 #
-bin_PROGRAMS = sql-slammer-scan dns-scan snmp-scan generic-udp-scan
+bin_PROGRAMS = generic-ip-scan
 #
-sql_slammer_scan_SOURCES = udp-scan-engine.c udp-scan-engine.h sql-slammer-scan.c sql-slammer-scan.h error.c
-sql_slammer_scan_LDADD = @COMPAT_OBJS@
-sql_slammer_scan_DEPENDENCIES = @COMPAT_OBJS@
-EXTRA_sql_slammer_scan_SOURCES = getopt.c getopt.h getopt1.c
-#
-dns_scan_SOURCES = udp-scan-engine.c udp-scan-engine.h dns-scan.c dns-scan.h error.c
-dns_scan_LDADD = @COMPAT_OBJS@ -lresolv /usr/lib/libresolv.a
-dns_scan_DEPENDENCIES = @COMPAT_OBJS@
-EXTRA_dns_scan_SOURCES = getopt.c getopt.h getopt1.c
-#
-snmp_scan_SOURCES = udp-scan-engine.c udp-scan-engine.h snmp-scan.c snmp-scan.h error.c
-snmp_scan_LDADD = @COMPAT_OBJS@
-snmp_scan_DEPENDENCIES = @COMPAT_OBJS@
-EXTRA_snmp_scan_SOURCES = getopt.c getopt.h getopt1.c
-#
-generic_udp_scan_SOURCES = udp-scan-engine.c udp-scan-engine.h generic-udp-scan.c generic-udp-scan.h error.c
-generic_udp_scan_LDADD = @COMPAT_OBJS@
-generic_udp_scan_DEPENDENCIES = @COMPAT_OBJS@
-EXTRA_generic_udp_scan_SOURCES = getopt.c getopt.h getopt1.c
+generic_ip_scan_SOURCES = rawip-scan-engine.c rawip-scan-engine.h generic-ip-scan.c generic-ip-scan.h error.c
+generic_ip_scan_LDADD = @COMPAT_OBJS@
+generic_ip_scan_DEPENDENCIES = @COMPAT_OBJS@
+EXTRA_generic_ip_scan_SOURCES = getopt.c getopt.h getopt1.c
