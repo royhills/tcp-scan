@@ -68,7 +68,6 @@ main(int argc, char *argv[]) {
    char filename[MAXLINE];
    int filename_flag=0;
    int sockfd;			/* UDP socket file descriptor */
-   struct sockaddr_in sa_local;
    struct sockaddr_in sa_peer;
    struct timeval now;
    char packet_in[MAXUDP];	/* Received packet */
@@ -91,6 +90,7 @@ main(int argc, char *argv[]) {
    static int reset_cum_err;
    static int pass_no;
    int first_timeout=1;
+   const int on = 1;		/* For setsockopt */
 /*
  *	Open syslog channel and log arguments if required.
  *	We must be careful here to avoid overflowing the arg_str buffer
@@ -221,19 +221,13 @@ main(int argc, char *argv[]) {
    if (!num_hosts)
       err_msg("No hosts to process.");
 /*
- *	Create UDP socket and bind to local source port.
+ *	Create raw IP socket and set IP_HDRINCL
  */
-   if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+   if ((sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0)
       err_sys("socket");
+   if ((setsockopt(sockfd, IPPROTO_IP, IP_HDRINCL, &on, sizeof(on))) != 0)
+      err_sys("setsockopt");
 
-   memset(&sa_local, '\0', sizeof(sa_local));
-   sa_local.sin_family = AF_INET;
-   sa_local.sin_addr.s_addr = htonl(INADDR_ANY);
-   sa_local.sin_port = htons(source_port);
-
-   if ((bind(sockfd, (struct sockaddr *)&sa_local, sizeof(sa_local))) < 0) {
-      err_sys("bind");
-   }
 /*
  *	Set current host pointer (cursor) to start of list, zero
  *	last packet sent time, and set last receive time to now.
