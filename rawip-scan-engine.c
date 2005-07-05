@@ -43,8 +43,9 @@ int filename_flag=0;
 int random_flag=0;			/* Randomise the list */
 int numeric_flag=0;			/* IP addresses only */
 int ipv6_flag=0;			/* IPv6 */
+unsigned interval=0;			/* Desired interval between packets */
+unsigned bandwidth=DEFAULT_BANDWIDTH;	/* Bandwidth in bits per sec */
 
-extern unsigned interval;		/* Desired interval between packets */
 extern char const scanner_name[];	/* Scanner Name */
 extern char const scanner_version[];	/* Scanner Version */
 extern unsigned retry;			/* Number of retries */
@@ -181,6 +182,12 @@ main(int argc, char *argv[]) {
    if (!num_hosts)
       err_msg("No hosts to process.");
 /*
+ *      Check that the combination of specified options and arguments is
+ *      valid.
+ */
+   if (interval && bandwidth != DEFAULT_BANDWIDTH)
+      err_msg("ERROR: You cannot specify both --bandwidth and --interval.");
+/*
  *	Create and initialise array of pointers to host entries.
  */
    helistptr = Malloc(num_hosts * sizeof(struct host_entry *));
@@ -215,6 +222,21 @@ main(int argc, char *argv[]) {
    last_packet_time.tv_sec=0;
    last_packet_time.tv_usec=0;
 /*
+ *      Calculate the required interval to achieve the required outgoing
+ *      bandwidth unless the interval was manually specified with --interval.
+ */
+   if (!interval) {
+      double float_interval;
+      size_t packet_out_len;
+
+      packet_out_len=send_packet(0, NULL, 1, NULL); /* Get packet data size */
+      float_interval = (((packet_out_len + PACKET_OVERHEAD) * 8) /
+                       (double) bandwidth) * 1000000;
+      interval = (unsigned) float_interval;
+      warn_msg("DEBUG: IP pkt len=%u bytes, bandwith=%u bps, int=%u us",
+               packet_out_len+PACKET_OVERHEAD, bandwidth, interval);
+   }
+/*
  *	Display initial message.
  */
    printf("Starting %s %s (%s) with %u hosts\n", scanner_name, scanner_version,
@@ -244,7 +266,7 @@ main(int argc, char *argv[]) {
  *	potentially send a packet to the current host.
  */
       timeval_diff(&now, &last_packet_time, &diff);
-      loop_timediff = 1000000*diff.tv_sec + diff.tv_usec;
+      loop_timediff = (unsigned long long)1000000*diff.tv_sec + diff.tv_usec;
       if (loop_timediff >= req_interval) {
          if (debug) {print_times(); printf("main: Can send packet now.  loop_timediff=%llu\n", loop_timediff);}
 /*
@@ -253,7 +275,7 @@ main(int argc, char *argv[]) {
  *	to it.
  */
          timeval_diff(&now, &((*cursor)->last_send_time), &diff);
-         host_timediff = 1000000*diff.tv_sec + diff.tv_usec;
+         host_timediff = (unsigned long long)1000000*diff.tv_sec + diff.tv_usec;
          if (host_timediff >= (*cursor)->timeout) {
             if (reset_cum_err) {
                if (debug) {print_times(); printf("main: Reset cum_err\n");}
@@ -287,7 +309,8 @@ main(int argc, char *argv[]) {
                remove_host(cursor);	/* Automatically calls advance_cursor() */
                if (first_timeout) {
                   timeval_diff(&now, &((*cursor)->last_send_time), &diff);
-                  host_timediff = 1000000*diff.tv_sec + diff.tv_usec;
+                  host_timediff = (unsigned long long)1000000*diff.tv_sec +
+                                  diff.tv_usec;
                   while (host_timediff >= (*cursor)->timeout && live_count) {
                      if ((*cursor)->live) {
                         if (verbose > 1)
@@ -297,7 +320,8 @@ main(int argc, char *argv[]) {
                         advance_cursor();
                      }
                      timeval_diff(&now, &((*cursor)->last_send_time), &diff);
-                     host_timediff = 1000000*diff.tv_sec + diff.tv_usec;
+                     host_timediff = (unsigned long long)1000000*diff.tv_sec +
+                                     diff.tv_usec;
                   }
                   first_timeout=0;
                }
@@ -576,24 +600,29 @@ recvfrom_wto(int s, unsigned char *buf, int len, struct sockaddr *saddr,
  *	diff	= Difference between timevals (a - b).
  */
 void
-timeval_diff(struct timeval *a, struct timeval *b, struct timeval *diff) {
+timeval_diff(const struct timeval *a, const struct timeval *b,
+             struct timeval *diff) {
+   struct timeval temp;
 
-   /* Perform the carry for the later subtraction by updating y. */
-   if (a->tv_usec < b->tv_usec) {
-     int nsec = (b->tv_usec - a->tv_usec) / 1000000 + 1;
-     b->tv_usec -= 1000000 * nsec;
-     b->tv_sec += nsec;
+   temp.tv_sec = b->tv_sec;
+   temp.tv_usec = b->tv_usec;
+
+   /* Perform the carry for the later subtraction by updating b. */
+   if (a->tv_usec < temp.tv_usec) {
+     int nsec = (temp.tv_usec - a->tv_usec) / 1000000 + 1;
+     temp.tv_usec -= 1000000 * nsec;
+     temp.tv_sec += nsec;
    }
-   if (a->tv_usec - b->tv_usec > 1000000) {
-     int nsec = (a->tv_usec - b->tv_usec) / 1000000;
-     b->tv_usec += 1000000 * nsec;
-     b->tv_sec -= nsec;
+   if (a->tv_usec - temp.tv_usec > 1000000) {
+     int nsec = (a->tv_usec - temp.tv_usec) / 1000000;
+     temp.tv_usec += 1000000 * nsec;
+     temp.tv_sec -= nsec;
    }
- 
+
    /* Compute the time difference
       tv_usec is certainly positive. */
-   diff->tv_sec = a->tv_sec - b->tv_sec;
-   diff->tv_usec = a->tv_usec - b->tv_usec;
+   diff->tv_sec = a->tv_sec - temp.tv_sec;
+   diff->tv_usec = a->tv_usec - temp.tv_usec;
 }
 
 /*
@@ -645,16 +674,21 @@ usage(void) {
    fprintf(stderr, "\n--interval=<n> or -i <n> Set minimum packet interval to <n> ms, default=%d.\n", interval/1000);
    fprintf(stderr, "\t\t\tThis controls the outgoing bandwidth usage by limiting\n");
    fprintf(stderr, "\t\t\tthe rate at which packets can be sent.  The packet\n");
-   fprintf(stderr, "\t\t\tinterval will be greater than or equal to this number.\n");
-   fprintf(stderr, "\t\t\tTo determine the required interval to achieve a given.\n");
-   fprintf(stderr, "\t\t\tbandwidth usage, use the following formula:\n");
-   fprintf(stderr, "\n");
-   fprintf(stderr, "\t\t\tinterval = ((packet_size * 8) / bandwidth) * 1000\n");
-   fprintf(stderr, "\n");
-   fprintf(stderr, "\t\t\tWhere interval is in ms, packet_size is in bytes, and\n");
-   fprintf(stderr, "\t\t\tbandwidth is in bits per second.\n");
+   fprintf(stderr, "\t\t\tinterval will be no smaller than this number.\n");
+   fprintf(stderr, "\t\t\tIf you want to use up to a given bandwidth, then it is\n");
+   fprintf(stderr, "\t\t\teasier to use the --bandwidth option instead.\n");
    fprintf(stderr, "\t\t\tThe interval specified is in milliseconds by default,\n");
    fprintf(stderr, "\t\t\tor in microseconds if \"u\" is appended to the value.\n");
+   fprintf(stderr, "\n--bandwidth=<n> or -B <n> Set desired outbound bandwidth to <n>.\n");
+   fprintf(stderr, "\t\t\tThe value is in bits per second by default.  If you\n");
+   fprintf(stderr, "\t\t\tappend \"K\" to the value, then the units are kilobits\n");
+   fprintf(stderr, "\t\t\tper sec; and if you append \"M\" to the value, the\n");
+   fprintf(stderr, "\t\t\tunits are megabits per second.\n");
+   fprintf(stderr, "\t\t\tThe \"K\" and \"M\" suffixes represent the decimal, not\n");
+   fprintf(stderr, "\t\t\tbinary, multiples.  So 64K is 64000, not 65536.\n");
+   fprintf(stderr, "\t\t\tYou cannot specify both --interval and --bandwidth\n");
+   fprintf(stderr, "\t\t\tbecause they are just different ways to change the\n");
+   fprintf(stderr, "\t\t\tsame parameter.\n");
    fprintf(stderr, "\n--backoff=<b> or -b <b>\tSet timeout backoff factor to <b>, default=%.2f.\n", backoff_factor);
    fprintf(stderr, "\t\t\tThe per-host timeout is multiplied by this factor\n");
    fprintf(stderr, "\t\t\tafter each timeout.  So, if the number of retrys\n");
@@ -895,9 +929,10 @@ process_options(int argc, char *argv[]) {
       {"random", no_argument, 0, 'R'},
       {"numeric", no_argument, 0, 'N'},
       {"ipv6", no_argument, 0, '6'},
+      {"bandwidth", required_argument, 0, 'B'},
       {0, 0, 0, 0}
    };
-   const char *short_options = "f:hp:r:t:i:b:vVdD:N6";
+   const char *short_options = "f:hp:r:t:i:b:vVdD:N6B:";
    int arg;
    int options_index=0;
 /*
@@ -911,6 +946,8 @@ process_options(int argc, char *argv[]) {
       switch (arg) {
          char interval_str[MAXLINE];    /* --interval argument */
          size_t interval_len;   /* --interval argument length */
+         char bandwidth_str[MAXLINE];   /* --bandwidth argument */
+         size_t bandwidth_len;  /* --bandwidth argument length */
 
          case 'f':	/* --file */
             strncpy(filename, optarg, MAXLINE);
@@ -962,6 +999,17 @@ process_options(int argc, char *argv[]) {
             break;
          case '6':      /* --ipv6 */
             ipv6_flag=1;
+            break;
+         case 'B':      /* --bandwidth */
+            strncpy(bandwidth_str, optarg, MAXLINE);
+            bandwidth_len=strlen(bandwidth_str);
+            if (bandwidth_str[bandwidth_len-1] == 'M') {
+               bandwidth=1000000 * strtoul(bandwidth_str, (char **)NULL, 10);
+            } else if (bandwidth_str[bandwidth_len-1] == 'K') {
+               bandwidth=1000 * strtoul(bandwidth_str, (char **)NULL, 10);
+            } else {
+               bandwidth=strtoul(bandwidth_str, (char **)NULL, 10);
+            }
             break;
          default:	/* Unknown option */
             usage();

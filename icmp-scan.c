@@ -26,7 +26,6 @@ static char const rcsid[] = "$Id$";   /* RCS ID for ident(1) */
 
 /* Global variables */
 int ip_protocol = DEFAULT_IP_PROTOCOL;	/* IP Protocol */
-unsigned interval = 1000 * DEFAULT_INTERVAL;	/* Interval between packets */
 unsigned retry = DEFAULT_RETRY;		/* Number of retries */
 unsigned timeout = DEFAULT_TIMEOUT;	/* Per-host timeout */
 float backoff_factor = DEFAULT_BACKOFF_FACTOR;	/* Backoff factor */
@@ -58,6 +57,8 @@ extern int filename_flag;
 extern int random_flag;			/* Randomise the list */
 extern int numeric_flag;		/* IP addreses only */
 extern int ipv6_flag;			/* IPv6 */
+extern unsigned bandwidth;
+extern unsigned interval;
 
 static uint32_t source_address;
 extern int pcap_fd;			/* pcap File Descriptor */
@@ -241,19 +242,19 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
  *	Inputs:
  *
  *	s		IP socket file descriptor
- *	he		Host entry to send to
+ *	he		Host entry to send to. If NULL, then no packet is sent
  *	ip_protocol	IP Protcol to use
  *	last_packet_time	Time when last packet was sent
  *
  *      Returns:
  *
- *      None.
+ *      The size of the packet that was sent.
  *
  *      This must construct an appropriate packet and send it to the host
  *      identified by "he" using the socket "s".
  *      It must also update the "last_send_time" field for this host entry.
  */
-void
+int
 send_packet(int s, struct host_entry *he, int ip_protocol,
             struct timeval *last_packet_time) {
    struct sockaddr_in sa_peer;
@@ -274,11 +275,20 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    struct pseudo_hdr *pseudo = (struct pseudo_hdr *) (buf + sizeof(struct ip) -
    sizeof(struct pseudo_hdr));
 /*
+ *      If he is NULL, just return with the packet length.
+ */
+   if (he == NULL) {
+      if (icmp_packet_type == 33)
+         return sizeof(struct iphdr) + sizeof(struct udphdr);
+      else
+         return sizeof(struct iphdr) + sizeof(struct icmphdr);
+   }
+/*
  *	Check that the host is live.  Complain if not.
  */
    if (!he->live) {
       warn_msg("***\tsend_packet called on non-live host entry: SHOULDN'T HAPPEN");
-      return;
+      return 0;
    }
 /*
  *	Set up the sockaddr_in structure for the host.
@@ -396,6 +406,7 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    if ((sendto(s, buf, buflen, 0, (struct sockaddr *) &sa_peer, sa_peer_len)) < 0) {
       err_sys("sendto");
    }
+   return buflen;
 }
 
 /*
@@ -1021,10 +1032,11 @@ local_process_options(int argc, char *argv[]) {
       {"numeric", no_argument, 0, 'N'},
       {"ipv6", no_argument, 0, '6'},
       {"icmptype", required_argument, 0, 'T'},
+      {"bandwidth", required_argument, 0, 'B'},
       {0, 0, 0, 0}
    };
    const char *short_options =
-      "f:hp:r:t:i:b:vVdD:n:l:I:qgF:O:RN:6T:";
+      "f:hp:r:t:i:b:vVdD:n:l:I:qgF:O:RN:6T:B:";
    int arg;
    int options_index=0;
 
@@ -1034,6 +1046,8 @@ local_process_options(int argc, char *argv[]) {
          char *p2;
          char interval_str[MAXLINE];    /* --interval argument */
          size_t interval_len;   /* --interval argument length */
+         char bandwidth_str[MAXLINE];   /* --bandwidth argument */
+         size_t bandwidth_len;  /* --bandwidth argument length */
 
          case 'f':	/* --file */
             strncpy(filename, optarg, MAXLINE);
@@ -1122,6 +1136,17 @@ local_process_options(int argc, char *argv[]) {
             break;
          case 'T':	/* --icmptype */
             icmp_packet_type = strtol(optarg, (char **)NULL, 0);
+            break;
+         case 'B':      /* --bandwidth */
+            strncpy(bandwidth_str, optarg, MAXLINE);
+            bandwidth_len=strlen(bandwidth_str);
+            if (bandwidth_str[bandwidth_len-1] == 'M') {
+               bandwidth=1000000 * strtoul(bandwidth_str, (char **)NULL, 10);
+            } else if (bandwidth_str[bandwidth_len-1] == 'K') {
+               bandwidth=1000 * strtoul(bandwidth_str, (char **)NULL, 10);
+            } else {
+               bandwidth=strtoul(bandwidth_str, (char **)NULL, 10);
+            }
             break;
          default:	/* Unknown option */
             usage();

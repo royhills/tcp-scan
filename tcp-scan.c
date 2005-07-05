@@ -26,7 +26,6 @@ static char const rcsid[] = "$Id$";   /* RCS ID for ident(1) */
 
 /* Global variables */
 int ip_protocol = DEFAULT_IP_PROTOCOL;	/* IP Protocol */
-unsigned interval = 1000 * DEFAULT_INTERVAL;	/* Interval between packets */
 unsigned retry = DEFAULT_RETRY;		/* Number of retries */
 unsigned timeout = DEFAULT_TIMEOUT;	/* Per-host timeout */
 float backoff_factor = DEFAULT_BACKOFF_FACTOR;	/* Backoff factor */
@@ -69,6 +68,8 @@ extern int filename_flag;
 extern int random_flag;			/* Randomise the list */
 extern int numeric_flag;		/* IP addreses only */
 extern int ipv6_flag;			/* IPv6 */
+extern unsigned bandwidth;
+extern unsigned interval;
 
 static uint32_t source_address;
 extern int pcap_fd;			/* pcap File Descriptor */
@@ -427,19 +428,19 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
  *	Inputs:
  *
  *	s		IP socket file descriptor
- *	he		Host entry to send to
+ *	he		Host entry to send to. If NULL, then no packet is sent
  *	ip_protocol	IP Protcol to use
  *	last_packet_time	Time when last packet was sent
  *
  *      Returns:
  *
- *      None.
+ *      The size of the packet that was sent.
  *
  *      This must construct an appropriate packet and send it to the host
  *      identified by "he" using the socket "s".
  *      It must also update the "last_send_time" field for this host entry.
  */
-void
+int
 send_packet(int s, struct host_entry *he, int ip_protocol,
             struct timeval *last_packet_time) {
    struct sockaddr_in sa_peer;
@@ -463,11 +464,31 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    unsigned char *optptr;
    size_t options_len=0;
 /*
+ *	Determine length of TCP options.
+ *	We do this early because we need it for the packet length.
+ */
+   if (mss) {
+      options_len += 4;
+   }
+   if (timestamp_flag) {
+      options_len += 12;
+   } else if (sack_flag) {
+      options_len += 4;
+   }
+   if (wscale_flag) {
+      options_len += 4;
+   }
+/*
+ *	If he is NULL, just return with the packet length.
+ */
+   if (he == NULL)
+      return sizeof(struct iphdr) + sizeof(struct tcphdr) + options_len;
+/*
  *	Check that the host is live.  Complain if not.
  */
    if (!he->live) {
       warn_msg("***\tsend_packet called on non-live host entry: SHOULDN'T HAPPEN");
-      return;
+      return 0;
    }
 /*
  *	Set up the sockaddr_in structure for the host.
@@ -486,6 +507,15 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    he->last_send_time.tv_usec = last_packet_time->tv_usec;
    he->num_sent++;
 /*
+ *	Construct the pseudo header (for TCP checksum purposes).
+ *	Note that this overlaps the IP header and gets overwritten later.
+ */
+   memset(pseudo, '\0', sizeof(struct pseudo_hdr));
+   pseudo->s_addr = source_address;
+   pseudo->d_addr = he->addr.v4.s_addr;
+   pseudo->proto  = ip_protocol;
+   pseudo->len    = htons(sizeof(struct tcphdr) + options_len);
+/*
  *	Add TCP options.  We do this before the TCP header because the
  *	options must be covered by the TCP checksum calculation.
  *
@@ -498,7 +528,6 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
       *optptr++ = 4;		/* Len=4 Bytes */
       *optptr++ = mss / 256;	/* MSS high byte */
       *optptr++ = mss % 256;	/* MSS low byte */
-      options_len += 4;
    }
    if (timestamp_flag) {
       uint32_t tsval=htonl(last_packet_time->tv_sec);
@@ -517,30 +546,18 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
       *optptr++ = 0;
       *optptr++ = 0;
       *optptr++ = 0;
-      options_len += 12;
    } else if (sack_flag) {
       *optptr++ = 1;		/* Kind=1 (NOP) - pad */
       *optptr++ = 1;		/* Kind=1 (NOP) - pad */
       *optptr++ = 4;		/* Kind=4 (SACKOK) */
       *optptr++ = 2;		/* Len=2 bytes */
-      options_len += 4;
    }
    if (wscale_flag) {
       *optptr++ = 1;		/* Kind=1 (NOP) - pad */
       *optptr++ = 3;		/* Kind=3 (WSCALE) */
       *optptr++ = 3;		/* Len=3 bytes */
       *optptr++ = 0;		/* Value=0 */
-      options_len += 4;
    }
-/*
- *	Construct the pseudo header (for TCP checksum purposes).
- *	Note that this overlaps the IP header and gets overwritten later.
- */
-   memset(pseudo, '\0', sizeof(struct pseudo_hdr));
-   pseudo->s_addr = source_address;
-   pseudo->d_addr = he->addr.v4.s_addr;
-   pseudo->proto  = ip_protocol;
-   pseudo->len    = htons(sizeof(struct tcphdr) + options_len);
 /*
  *	Construct the TCP header.
  */
@@ -605,6 +622,7 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
    if ((sendto(s, buf, buflen, 0, (struct sockaddr *) &sa_peer, sa_peer_len)) < 0) {
       err_sys("sendto");
    }
+   return buflen;
 }
 
 /*
@@ -1317,10 +1335,11 @@ local_process_options(int argc, char *argv[]) {
       {"portname", no_argument, 0, 'P'},
       {"flags", required_argument, 0, 'L'},
       {"ipv6", no_argument, 0, '6'},
+      {"bandwidth", required_argument, 0, 'B'},
       {0, 0, 0, 0}
    };
    const char *short_options =
-      "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:WaTn:l:I:qgF:O:RNPL:6";
+      "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:WaTn:l:I:qgF:O:RNPL:6B:";
    int arg;
    int options_index=0;
 
@@ -1330,6 +1349,8 @@ local_process_options(int argc, char *argv[]) {
          char *p2;
          char interval_str[MAXLINE];    /* --interval argument */
          size_t interval_len;   /* --interval argument length */
+         char bandwidth_str[MAXLINE];   /* --bandwidth argument */
+         size_t bandwidth_len;  /* --bandwidth argument length */
 
          case 'f':	/* --file */
             strncpy(filename, optarg, MAXLINE);
@@ -1452,6 +1473,17 @@ local_process_options(int argc, char *argv[]) {
             break;
          case '6':	/* --ipv6 */
             ipv6_flag=1;
+            break;
+         case 'B':      /* --bandwidth */
+            strncpy(bandwidth_str, optarg, MAXLINE);
+            bandwidth_len=strlen(bandwidth_str);
+            if (bandwidth_str[bandwidth_len-1] == 'M') {
+               bandwidth=1000000 * strtoul(bandwidth_str, (char **)NULL, 10);
+            } else if (bandwidth_str[bandwidth_len-1] == 'K') {
+               bandwidth=1000 * strtoul(bandwidth_str, (char **)NULL, 10);
+            } else {
+               bandwidth=strtoul(bandwidth_str, (char **)NULL, 10);
+            }
             break;
          default:	/* Unknown option */
             usage();

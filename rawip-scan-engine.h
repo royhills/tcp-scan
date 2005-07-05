@@ -91,6 +91,8 @@
 #define SYSLOG 1			/* Use syslog if defined */
 #define SYSLOG_FACILITY LOG_USER	/* Syslog facility to use */
 #define REALLOC_COUNT 1000		/* Entries to realloc at once */
+#define DEFAULT_BANDWIDTH 56000		/* Default bandwidth in bits/sec */
+#define PACKET_OVERHEAD 0
 
 /* Structures */
 typedef union {
@@ -119,10 +121,11 @@ void info_syslog(const char *, ...);
 void err_print(int, int, const char *, va_list);
 void usage(void);
 void add_host(char *, unsigned);
-void send_packet(int, struct host_entry *, int, struct timeval *);
+int send_packet(int, struct host_entry *, int, struct timeval *);
 void recvfrom_wto(int, unsigned char *, int, struct sockaddr *, int);
 void remove_host(struct host_entry **);
-void timeval_diff(struct timeval *, struct timeval *, struct timeval *);
+void timeval_diff(const struct timeval *, const struct timeval *,
+                  struct timeval *);
 struct host_entry *find_host(struct host_entry **, struct in_addr *,
                              const unsigned char *, int);
 void display_packet(int, const unsigned char *, struct host_entry *,
