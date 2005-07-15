@@ -114,11 +114,6 @@ main(int argc, char *argv[]) {
    Gettimeofday(&start_time);
    if (debug) {print_times(); printf("main: Start\n");}
 /*
- *	Call protocol-specific initialisation routine to perform any
- *	initial setup required.
- */
-   initialise();
-/*
  *	Create raw IP socket and set IP_HDRINCL
  */
    if ((sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0)
@@ -133,6 +128,11 @@ main(int argc, char *argv[]) {
    if ((setuid(getuid())) < 0) {
       err_sys("setuid");
    }
+/*
+ *	Call protocol-specific initialisation routine to perform any
+ *	initial setup required.
+ */
+   initialise();
 /*
  *	If we're not reading from a file, then we must have some hosts
  *	given as command line arguments.
