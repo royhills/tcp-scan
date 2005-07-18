@@ -742,25 +742,25 @@ initialise(void) {
       unsigned int port;
       char prot[4];
 
-      if ((fp = fopen(SERVICE_FILE, "r")) != NULL) {
-         portnames = Malloc(65536 * sizeof(char *));
-         for (i=0; i<65536; i++)
-            portnames[i] = NULL;
-         while (fgets(lbuf, MAXLINE, fp)) {
-            if (strchr("*# \t\n", lbuf[0]))
-                continue;
-            if (!(p = strchr (lbuf, '/')))
-                continue;
-            *p = ' ';
-            desc[0]='\0';
-            n=sscanf(lbuf, "%16s %u %3s %255[^\r\n]", portname, &port, prot,
-                     desc);
-            if (n >= 3 && !strcmp(prot, "tcp") && (port < 65536)) {
-               portnames[port] = make_message("%s", portname);
-            }
+      if ((access(SERVICE_FILE, R_OK)) != 0)
+         err_sys("Cannot open services file");
+      if (!(fp = fopen(SERVICE_FILE, "r")))
+         err_sys("Cannot open services file");
+      portnames = Malloc(65536 * sizeof(char *));
+      for (i=0; i<65536; i++)
+         portnames[i] = NULL;
+      while (fgets(lbuf, MAXLINE, fp)) {
+         if (strchr("*# \t\n", lbuf[0]))
+             continue;
+         if (!(p = strchr (lbuf, '/')))
+             continue;
+         *p = ' ';
+         desc[0]='\0';
+         n=sscanf(lbuf, "%16s %u %3s %255[^\r\n]", portname, &port, prot,
+                  desc);
+         if (n >= 3 && !strcmp(prot, "tcp") && (port < 65536)) {
+            portnames[port] = make_message("%s", portname);
          }
-      } else {
-         perror("Cannot open services file");
       }
    }
 }
@@ -1523,6 +1523,8 @@ create_port_list(char *filename) {
       err_msg("Service file has already been specified");
 
    prot[3]='\0';
+   if ((access(filename, R_OK)) != 0)
+      err_sys("fopen %s", filename);
    if (!(fh = fopen (filename, "r")))
       err_sys("fopen %s", filename);
 
