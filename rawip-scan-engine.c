@@ -123,16 +123,16 @@ main(int argc, char *argv[]) {
    if ((setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &on, sizeof(on))) != 0)
       err_sys("setsockopt");
 /*
+ *	Call protocol-specific initialisation routine to perform any
+ *	initial setup required.
+ */
+   initialise();
+/*
  *	Drop privileges.
  */
    if ((setuid(getuid())) < 0) {
       err_sys("setuid");
    }
-/*
- *	Call protocol-specific initialisation routine to perform any
- *	initial setup required.
- */
-   initialise();
 /*
  *	If we're not reading from a file, then we must have some hosts
  *	given as command line arguments.
