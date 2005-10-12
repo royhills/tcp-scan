@@ -82,7 +82,9 @@
 #include <arpa/inet.h>
 #endif
 
+#ifdef HAVE_PCAP_H
 #include <pcap.h>
+#endif
 
 /* Defines */
 
