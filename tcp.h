@@ -29,8 +29,8 @@
  *	@(#)tcp.h	8.1 (Berkeley) 6/10/93
  */
 
-#ifndef _NETINET_TCP_H
-#define _NETINET_TCP_H	1
+#ifndef NTA_NETINET_TCP_H
+#define NTA_NETINET_TCP_H	1
 
 #include <features.h>
 
