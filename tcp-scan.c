@@ -31,7 +31,9 @@ unsigned timeout = DEFAULT_TIMEOUT;	/* Per-host timeout */
 float backoff_factor = DEFAULT_BACKOFF_FACTOR;	/* Backoff factor */
 int snaplen = SNAPLEN;			/* Pcap snap length */
 uint32_t seq_no;			/* Initial TCP sequence number */
+uint32_t ack_no;			/* TCP acknowledgement number */
 int seq_no_flag=0;
+int ack_no_flag=0;
 uint16_t source_port;			/* TCP Source Port */
 int source_port_flag=0;
 uint16_t window=DEFAULT_WINDOW;		/* TCP Window size */
@@ -51,7 +53,7 @@ int tcp_flags_flag=0;			/* Specify outbound TCP flags */
 struct tcp_flags_struct tcp_flags;	/* Specified TCP flags */
 char **portnames=NULL;
 char const scanner_name[] = "tcp-scan";
-char const scanner_version[] = "1.11";
+char const scanner_version[] = "1.12";
 
 extern int verbose;	/* Verbose level */
 extern int debug;	/* Debug flag */
@@ -573,8 +575,10 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
          tcph->ecn = 1;
       if (tcp_flags.urg)
          tcph->urg = 1;
-      if (tcp_flags.ack)
+      if (tcp_flags.ack) {
          tcph->ack = 1;
+         tcph->ack_seq = htonl(ack_no);
+      }
       if (tcp_flags.psh)
          tcph->psh = 1;
       if (tcp_flags.rst)
@@ -671,7 +675,7 @@ initialise(void) {
    md5_append(&context, (const md5_byte_t *)str, strlen(str));
    md5_finish(&context, md5_digest);
 /*
- *	Set the sequence number and source port using the MD5 hash
+ *	Set the sequence number, ack number and source port using the MD5 hash
  *	if they have not been set with command line options.
  *	We set the top bit of source port to make sure that it's
  *	above 32768 and therefore out of the way of reserved ports
@@ -679,8 +683,11 @@ initialise(void) {
  */
    if (!seq_no_flag)
       memcpy(&seq_no, md5_digest, sizeof(uint32_t));
+   if (!ack_no_flag)
+      memcpy(&ack_no, md5_digest+sizeof(uint32_t), sizeof(uint32_t));
    if (!source_port_flag) {
-      memcpy(&source_port, md5_digest+sizeof(uint32_t), sizeof(uint16_t));
+      memcpy(&source_port, md5_digest+sizeof(uint32_t)+sizeof(uint32_t),
+             sizeof(uint16_t));
       source_port |= 0x8000;
    }
 /*
@@ -721,8 +728,13 @@ initialise(void) {
       err_msg("pcap_setnonblock: %s\n", errbuf);
    if (pcap_lookupnet(if_name, &localnet, &netmask, errbuf) < 0)
       err_msg("pcap_lookupnet: %s\n", errbuf);
-   filter_string=make_message("tcp dst port %u and tcp[8:4] = %u",
-                              source_port, seq_no+1);
+   if (tcp_flags_flag && tcp_flags.ack) {
+      filter_string=make_message("tcp dst port %u and tcp[4:4] = %u",
+                                 source_port, ack_no);
+   } else {
+      filter_string=make_message("tcp dst port %u and tcp[8:4] = %u",
+                                 source_port, seq_no+1);
+   }
    if ((pcap_compile(handle, &filter, filter_string, OPTIMISE, netmask)) < 0)
       err_msg("pcap_geterr: %s\n", pcap_geterr(handle));
    free(filter_string);
@@ -835,6 +847,10 @@ local_help(void) {
    fprintf(stderr, "\t\t\tThe default is a random port in the range 32678-65535.\n");
    fprintf(stderr, "\n--seq=<s> or -e <s>\tSpecify initial sequence number.\n");
    fprintf(stderr, "\t\t\tThe default initial sequence number is random.\n");
+   fprintf(stderr, "\n--ack=<a> or -c <a>\tSpecify initial acknowledgement number.\n");
+   fprintf(stderr, "\t\t\tThe default initial acknowledgement number is random.\n");
+   fprintf(stderr, "\t\t\tThis is only applicable when the ACK flag is set in\n");
+   fprintf(stderr, "\t\t\toutgoing packets.\n");
    fprintf(stderr, "\n--window=<w> or -w <w>\tSpecify the TCP window size.\n");
    fprintf(stderr, "\t\t\tThe default window size is %u.\n", DEFAULT_WINDOW);
    fprintf(stderr, "\n--openonly or -o\tOnly display open ports.\n");
@@ -1336,10 +1352,11 @@ local_process_options(int argc, char *argv[]) {
       {"flags", required_argument, 0, 'L'},
       {"ipv6", no_argument, 0, '6'},
       {"bandwidth", required_argument, 0, 'B'},
+      {"ack", required_argument, 0, 'c'},
       {0, 0, 0, 0}
    };
    const char *short_options =
-      "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:WaTn:l:I:qgF:O:RNPL:6B:";
+      "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:WaTn:l:I:qgF:O:RNPL:6B:c:";
    int arg;
    int options_index=0;
 
@@ -1484,6 +1501,10 @@ local_process_options(int argc, char *argv[]) {
             } else {
                bandwidth=strtoul(bandwidth_str, (char **)NULL, 10);
             }
+            break;
+         case 'c':	/* --ack */
+            ack_no=strtoul(optarg, (char **)NULL, 0);
+            ack_no_flag=1;
             break;
          default:	/* Unknown option */
             usage();
