@@ -36,7 +36,7 @@ unsigned max_iter;			/* Max iterations in find_host() */
 int verbose=0;				/* Verbose level */
 int debug = 0;				/* Debug flag */
 char *local_data=NULL;			/* Local data for scanner */
-pcap_t *handle;
+pcap_t *handle;				/* pcap handle */
 int pcap_fd;				/* Pcap file descriptor */
 char filename[MAXLINE];
 int filename_flag=0;
@@ -233,7 +233,7 @@ main(int argc, char *argv[]) {
       float_interval = (((packet_out_len + PACKET_OVERHEAD) * 8) /
                        (double) bandwidth) * 1000000;
       interval = (unsigned) float_interval;
-      warn_msg("DEBUG: IP pkt len=%u bytes, bandwith=%u bps, int=%u us",
+      warn_msg("DEBUG: IP pkt len=%u bytes, bandwidth=%u bps, int=%u us",
                packet_out_len+PACKET_OVERHEAD, bandwidth, interval);
    }
 /*

@@ -60,7 +60,7 @@ extern struct host_entry *helist;	/* Array of host entries */
 struct host_entry **helistptr;		/* Array of pointers to host entries */
 extern unsigned num_hosts;		/* Number of entries in the list */
 extern unsigned max_iter;		/* Max iterations in find_host() */
-extern pcap_t *handle;
+extern pcap_t *handle;			/* pcap handle */
 extern struct host_entry **cursor;
 extern unsigned responders;		/* Number of hosts which responded */
 extern char filename[MAXLINE];
