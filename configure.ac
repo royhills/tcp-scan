@@ -1,16 +1,13 @@
 dnl $Id$
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT(rawip-scan-engine, 1.4, [rawip-scan-engine@nta-monitor.com])
+AC_INIT([rawip-scan-engine], [1.4], [rawip-scan-engine@nta-monitor.com])
+AC_PREREQ(2.59)
+AC_REVISION($Revision$)
 AC_CONFIG_SRCDIR([rawip-scan-engine.c])
-dnl If I don't pass $PACKAGE_NAME and $PACKAGE_VERSION to AM_INIT_AUTOMAKE,
-dnl then PACKAGE and VERSION are not defined and these are required for
-dnl make dist.  The documentation implies that I shouldn't need to
-dnl supply these arguments, but I find that I do need to with autoconf 2.53 and
-dnl automake 1.4.
-AM_INIT_AUTOMAKE($PACKAGE_NAME, $PACKAGE_VERSION)
+AM_INIT_AUTOMAKE(1.9)
 
-AM_CONFIG_HEADER(config.h)
+AM_CONFIG_HEADER([config.h])
 
 dnl Checks for programs.
 AC_PROG_CC
@@ -22,15 +19,14 @@ AC_PROG_LN_S
 
 dnl Checks for libraries.
 dnl Solaris 8 needs nsl and socket.  Linux and {Free,Open}BSD do not.
-AC_CHECK_LIB(nsl, t_open)
-AC_CHECK_LIB(socket, socket)
-
-AC_SUBST(COMPAT_OBJS)
-AC_SUBST(COMPAT_SRCS)
+dnl Just about everything will need pcap.
+AC_SEARCH_LIBS([gethostbyname], [nsl])
+AC_SEARCH_LIBS([socket], [socket])
+AC_SEARCH_LIBS([pcap_open_live], [pcap])
 
 dnl Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS([arpa/inet.h netdb.h netinet/in.h sys/socket.h sys/time.h syslog.h unistd.h getopt.h])
+AC_CHECK_HEADERS([arpa/inet.h netdb.h netinet/in.h sys/socket.h sys/time.h syslog.h unistd.h getopt.h pcap.h])
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -43,6 +39,57 @@ AC_NTA_CHECK_TYPE(uint8_t, unsigned char)
 AC_NTA_CHECK_TYPE(uint16_t, unsigned short)
 AC_NTA_CHECK_TYPE(uint32_t, unsigned int)
 
+dnl Checks for 64-bit integer types.  These checks are from postgresql.
+dnl Check to see if we have a working 64-bit integer type.
+dnl This breaks down into two steps:
+dnl (1) figure out if the compiler has a 64-bit int type with working
+dnl arithmetic, and if so
+dnl (2) see whether snprintf() can format the type correctly.
+
+PGAC_TYPE_64BIT_INT([long int])
+
+if test x"$HAVE_LONG_INT_64" = x"yes" ; then
+  INT64_TYPE="long int"
+  UINT64_TYPE="unsigned long int"
+else
+  PGAC_TYPE_64BIT_INT([long long int])
+    if test x"$HAVE_LONG_LONG_INT_64" = x"yes" ; then
+      INT64_TYPE="long long int"
+      UINT64_TYPE="unsigned long long int"
+    else
+      AC_MSG_ERROR([cannot determine 64-bit integer type])
+    fi
+fi
+
+AC_DEFINE_UNQUOTED(ARP_INT64, $INT64_TYPE,
+                   [Define to the appropriate type for 64-bit ints.])
+AC_DEFINE_UNQUOTED(ARP_UINT64, $UINT64_TYPE,
+                   [Define to the appropriate type for unsigned 64-bit ints.])
+
+dnl If we found "long int" is 64 bits, assume snprintf handles it.  If
+dnl we found we need to use "long long int", better check.  We cope with
+dnl snprintfs that use %lld, %qd, or %I64d as the format.
+dnl
+if test "$HAVE_LONG_LONG_INT_64" = yes ; then
+  PGAC_FUNC_SNPRINTF_LONG_LONG_INT_FORMAT
+  if test "$LONG_LONG_INT_FORMAT" = ""; then
+    AC_MSG_ERROR([cannot determine snprintf format string for long long int])
+  fi
+  LONG_LONG_UINT_FORMAT=`echo "$LONG_LONG_INT_FORMAT" | sed 's/d$/u/'`
+  INT64_FORMAT="\"$LONG_LONG_INT_FORMAT\""
+  UINT64_FORMAT="\"$LONG_LONG_UINT_FORMAT\""
+else
+  # Here if we are not using 'long long int' at all
+  INT64_FORMAT='"%ld"'
+  UINT64_FORMAT='"%lu"'
+fi
+
+AC_DEFINE_UNQUOTED(ARP_INT64_FORMAT, $INT64_FORMAT,
+                   [Define to the appropriate snprintf format for 64-bit ints.])
+
+AC_DEFINE_UNQUOTED(ARP_UINT64_FORMAT, $UINT64_FORMAT,
+                   [Define to the appropriate snprintf format for unsigned 64-bit ints.])
+
 dnl Checks for library functions.
 AC_CHECK_FUNCS([malloc gethostbyname gettimeofday inet_ntoa memset select socket strerror])
 
@@ -52,21 +99,11 @@ AC_NTA_NET_SIZE_T
 
 dnl GNU systems e.g. Linux have getopt_long_only, but many other systems
 dnl e.g. FreeBSD 4.3 and Solaris 8 do not.  For systems that don't have it,
-dnl we compile the GNU getopt sources (obtained from glibc) and link with the
-dnl resultant objects.
-dnl
-dnl We should be able to use AC_LIBOBJ here, but I've not been able to get
-dnl that to work with automake 1.4 and autoconf 2.53.
-AC_CHECK_FUNC(getopt_long_only, ,
-  [ COMPAT_SRCS="$COMPAT_SRCS getopt.c getopt1.c"
-    COMPAT_OBJS="$COMPAT_OBJS getopt.o getopt1.o" ])
-
-dnl Add libpcap library and includes.
-dnl FIXME: Don't hard-code directory paths here; call a macro to find the
-dnl FIXME: best libpcap library and header file, and check for minimum
-dnl FIXME: acceptable version like tcpdump does.
-CPPFLAGS="$CFLAGS -I/usr/local/src/libpcap-0.8.1 "
-LIBS="$LIBS /usr/local/src/libpcap-0.8.1/libpcap.a "
+dnl use the GNU getopt sources (obtained from glibc).
+AC_CHECK_FUNC([getopt_long_only], ,
+  [ AC_LIBOBJ(getopt)
+    AC_LIBOBJ(getopt1)
+    AC_LIBSOURCE(getopt.h) ])
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
