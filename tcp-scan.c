@@ -1377,21 +1377,21 @@ local_process_options(int argc, char *argv[]) {
             usage();
             break;
          case 'p':	/* --protocol */
-            ip_protocol=atoi(optarg);
+            ip_protocol=Strtoul(optarg, 10);
             break;
          case 'r':	/* --retry */
-            retry=atoi(optarg);
+            retry=Strtoul(optarg, 10);
             break;
          case 't':	/* --timeout */
-            timeout=atoi(optarg);
+            timeout=Strtoul(optarg, 10);
             break;
          case 'i':	/* --interval */
             strncpy(interval_str, optarg, MAXLINE);
             interval_len=strlen(interval_str);
             if (interval_str[interval_len-1] == 'u') {
-               interval=strtoul(interval_str, (char **)NULL, 10);
+               interval=Strtoul(interval_str, 10);
             } else {
-               interval=1000 * strtoul(interval_str, (char **)NULL, 10);
+               interval=1000 * Strtoul(interval_str, 10);
             }
             break;
          case 'b':	/* --backoff */
@@ -1419,15 +1419,15 @@ local_process_options(int argc, char *argv[]) {
             *p2 = '\0';
             break;
          case 's':	/* --sport */
-            source_port=strtoul(optarg, (char **)NULL, 0);
+            source_port=Strtoul(optarg, 0);
             source_port_flag=1;
             break;
          case 'e':	/* --seq */
-            seq_no=strtoul(optarg, (char **)NULL, 0);
+            seq_no=Strtoul(optarg, 0);
             seq_no_flag=1;
             break;
          case 'w':	/* --window */
-            window=strtoul(optarg, (char **)NULL, 0);
+            window=Strtoul(optarg, 0);
             break;
          case 'o':	/* --openonly */
             open_only=1;
@@ -1436,7 +1436,7 @@ local_process_options(int argc, char *argv[]) {
             create_port_list(optarg);
             break;
          case 'm':	/* --mss */
-            mss=strtoul(optarg, (char **)NULL, 0);
+            mss=Strtoul(optarg, 0);
             break;
          case 'W':	/* --wscale */
             wscale_flag=1;
@@ -1495,15 +1495,15 @@ local_process_options(int argc, char *argv[]) {
             strncpy(bandwidth_str, optarg, MAXLINE);
             bandwidth_len=strlen(bandwidth_str);
             if (bandwidth_str[bandwidth_len-1] == 'M') {
-               bandwidth=1000000 * strtoul(bandwidth_str, (char **)NULL, 10);
+               bandwidth=1000000 * Strtoul(bandwidth_str, 10);
             } else if (bandwidth_str[bandwidth_len-1] == 'K') {
-               bandwidth=1000 * strtoul(bandwidth_str, (char **)NULL, 10);
+               bandwidth=1000 * Strtoul(bandwidth_str, 10);
             } else {
-               bandwidth=strtoul(bandwidth_str, (char **)NULL, 10);
+               bandwidth=Strtoul(bandwidth_str, 10);
             }
             break;
          case 'c':	/* --ack */
-            ack_no=strtoul(optarg, (char **)NULL, 0);
+            ack_no=Strtoul(optarg, 0);
             ack_no_flag=1;
             break;
          default:	/* Unknown option */

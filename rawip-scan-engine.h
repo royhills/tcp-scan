@@ -25,7 +25,6 @@
 #include <ctype.h>
 #include <stdarg.h>
 #include <errno.h>
-#include <math.h>
 #else
 #error This program requires the ANSI C Headers
 #endif
@@ -94,7 +93,8 @@
 #define SYSLOG_FACILITY LOG_USER	/* Syslog facility to use */
 #define REALLOC_COUNT 1000		/* Entries to realloc at once */
 #define DEFAULT_BANDWIDTH 56000		/* Default bandwidth in bits/sec */
-#define PACKET_OVERHEAD 0
+#define MINIMUM_FRAME_SIZE 46		/* Minimum data size for layer 2 */
+#define PACKET_OVERHEAD 18		/* Size of Ethernet header */
 
 /* Structures */
 typedef union {
@@ -154,5 +154,6 @@ const char *my_ntoa(ip_address);
 int Gettimeofday(struct timeval *);
 void *Malloc(size_t);
 void *Realloc(void *, size_t);
+unsigned long int Strtoul(const char *, int);
 /* The following functions are just to prevent rcsid being optimised away */
 void wrappers_use_rcsid(void);

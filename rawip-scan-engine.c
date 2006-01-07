@@ -226,15 +226,15 @@ main(int argc, char *argv[]) {
  *      bandwidth unless the interval was manually specified with --interval.
  */
    if (!interval) {
-      double float_interval;
       size_t packet_out_len;
 
       packet_out_len=send_packet(0, NULL, 1, NULL); /* Get packet data size */
-      float_interval = (((packet_out_len + PACKET_OVERHEAD) * 8) /
-                       (double) bandwidth) * 1000000;
-      interval = (unsigned) float_interval;
-      warn_msg("DEBUG: IP pkt len=%u bytes, bandwidth=%u bps, int=%u us",
-               packet_out_len+PACKET_OVERHEAD, bandwidth, interval);
+      if (packet_out_len < MINIMUM_FRAME_SIZE)
+         packet_out_len = MINIMUM_FRAME_SIZE;   /* Adjust to minimum size */
+      packet_out_len += PACKET_OVERHEAD;        /* Add layer 2 overhead */
+      interval = ((ARP_UINT64)packet_out_len * 8 * 1000000) / bandwidth;
+      warn_msg("DEBUG: Ether pkt len=%u bytes, bandwidth=%u bps, int=%u us",
+               packet_out_len, bandwidth, interval);
    }
 /*
  *	Display initial message.
@@ -957,21 +957,21 @@ process_options(int argc, char *argv[]) {
             usage();
             break;
          case 'p':	/* --protocol */
-            ip_protocol=atoi(optarg);
+            ip_protocol=Strtoul(optarg, 10);
             break;
          case 'r':	/* --retry */
-            retry=atoi(optarg);
+            retry=Strtoul(optarg, 10);
             break;
          case 't':	/* --timeout */
-            timeout=atoi(optarg);
+            timeout=Strtoul(optarg, 10);
             break;
          case 'i':	/* --interval */
             strncpy(interval_str, optarg, MAXLINE);
             interval_len=strlen(interval_str);
             if (interval_str[interval_len-1] == 'u') {
-               interval=strtoul(interval_str, (char **)NULL, 10);
+               interval=Strtoul(interval_str, 10);
             } else {
-               interval=1000 * strtoul(interval_str, (char **)NULL, 10);
+               interval=1000 * Strtoul(interval_str, 10);
             }
             break;
          case 'b':	/* --backoff */
@@ -1004,11 +1004,11 @@ process_options(int argc, char *argv[]) {
             strncpy(bandwidth_str, optarg, MAXLINE);
             bandwidth_len=strlen(bandwidth_str);
             if (bandwidth_str[bandwidth_len-1] == 'M') {
-               bandwidth=1000000 * strtoul(bandwidth_str, (char **)NULL, 10);
+               bandwidth=1000000 * Strtoul(bandwidth_str, 10);
             } else if (bandwidth_str[bandwidth_len-1] == 'K') {
-               bandwidth=1000 * strtoul(bandwidth_str, (char **)NULL, 10);
+               bandwidth=1000 * Strtoul(bandwidth_str, 10);
             } else {
-               bandwidth=strtoul(bandwidth_str, (char **)NULL, 10);
+               bandwidth=Strtoul(bandwidth_str, 10);
             }
             break;
          default:	/* Unknown option */

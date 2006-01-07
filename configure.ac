@@ -1,7 +1,7 @@
 dnl $Id$
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT([rawip-scan-engine], [1.4], [rawip-scan-engine@nta-monitor.com])
+AC_INIT([rawip-scan-engine], [1.5], [rawip-scan-engine@nta-monitor.com])
 AC_PREREQ(2.59)
 AC_REVISION($Revision$)
 AC_CONFIG_SRCDIR([rawip-scan-engine.c])
