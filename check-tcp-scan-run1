@@ -1,0 +1,45 @@
+#!/bin/sh
+# $Id$
+#
+# check-tcp-scan-run1 -- Shell script to test tcp-scan basic functionality
+#
+# Author: Roy Hills
+# Date: 9 March 2006
+#
+# This shell script checks that "tcp-scan --help" and "tcp-scan --version"
+# work.  These options don't use much of the tcp-scan functionallity, so if
+# they fail, then there is a fundimental problem with the program.
+#
+TMPFILE=/tmp/tcp-scan-test.$$.tmp
+#
+echo "Checking tcp-scan --help ..."
+$srcdir/tcp-scan --help 2> $TMPFILE
+if test $? -ne 0; then
+   rm -f $TMPFILE
+   echo "FAILED"
+   exit 1
+fi
+grep '^Report bugs or send suggestions to ' $TMPFILE >/dev/null
+if test $? -ne 0; then
+   rm -f $TMPFILE
+   echo "FAILED"
+   exit 1
+fi
+echo "ok"
+#
+echo "Checking tcp-scan --version ..."
+$srcdir/tcp-scan --version 2> $TMPFILE
+if test $? -ne 0; then
+   rm -f $TMPFILE
+   echo "FAILED"
+   exit 1
+fi
+grep '^Copyright (C) ' $TMPFILE >/dev/null
+if test $? -ne 0; then
+   rm -f $TMPFILE
+   echo "FAILED"
+   exit 1
+fi
+echo "ok"
+#
+rm -f $TMPFILE

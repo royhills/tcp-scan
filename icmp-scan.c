@@ -1054,7 +1054,7 @@ local_process_options(int argc, char *argv[]) {
             filename_flag=1;
             break;
          case 'h':	/* --help */
-            usage();
+            usage(EXIT_SUCCESS);
             break;
          case 'p':	/* --protocol */
             ip_protocol=Strtoul(optarg, 10);
@@ -1149,7 +1149,7 @@ local_process_options(int argc, char *argv[]) {
             }
             break;
          default:	/* Unknown option */
-            usage();
+            usage(EXIT_FAILURE);
             break;
       }
    }

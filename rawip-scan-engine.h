@@ -121,7 +121,7 @@ void err_msg(const char *, ...);
 void warn_msg(const char *, ...);
 void info_syslog(const char *, ...);
 void err_print(int, int, const char *, va_list);
-void usage(void);
+void usage(int);
 void add_host(char *, unsigned);
 int send_packet(int, struct host_entry *, int, struct timeval *);
 void recvfrom_wto(int, unsigned char *, int, struct sockaddr *, int);

@@ -141,7 +141,7 @@ main(int argc, char *argv[]) {
    hp = get_host_address(namebuf, AF_INET, NULL, &ga_err_msg);
    if (!filename_flag) 
       if ((argc - optind) < 1)
-         usage();
+         usage(EXIT_FAILURE);
 /*
  *	Populate the list from the specified file if --file was specified, or
  *	otherwise from the remaining command line arguments.
@@ -648,10 +648,10 @@ dump_list(void) {
  *
  *	Inputs:
  *
- *	None.
+ *	status	Status value to pass to exit()
  */
 void
-usage(void) {
+usage(int status) {
    fprintf(stderr, "Usage: %s [options] [hosts...]\n", scanner_name);
    fprintf(stderr, "\n");
    fprintf(stderr, "Hosts are specified on the command line unless the --file option is specified.\n");
@@ -712,7 +712,7 @@ usage(void) {
    local_help();
    fprintf(stderr, "\n");
    fprintf(stderr, "Report bugs or send suggestions to %s\n", PACKAGE_BUGREPORT);
-   exit(1);
+   exit(status);
 }
 
 /*
@@ -954,7 +954,7 @@ process_options(int argc, char *argv[]) {
             filename_flag=1;
             break;
          case 'h':	/* --help */
-            usage();
+            usage(EXIT_SUCCESS);
             break;
          case 'p':	/* --protocol */
             ip_protocol=Strtoul(optarg, 10);
@@ -1012,7 +1012,7 @@ process_options(int argc, char *argv[]) {
             }
             break;
          default:	/* Unknown option */
-            usage();
+            usage(EXIT_FAILURE);
             break;
       }
    }
