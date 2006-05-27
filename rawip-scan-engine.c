@@ -233,8 +233,10 @@ main(int argc, char *argv[]) {
          packet_out_len = MINIMUM_FRAME_SIZE;   /* Adjust to minimum size */
       packet_out_len += PACKET_OVERHEAD;        /* Add layer 2 overhead */
       interval = ((ARP_UINT64)packet_out_len * 8 * 1000000) / bandwidth;
-      warn_msg("DEBUG: Ether pkt len=%u bytes, bandwidth=%u bps, int=%u us",
-               packet_out_len, bandwidth, interval);
+      if (verbose) {
+         warn_msg("DEBUG: Ether pkt len=%u bytes, bandwidth=%u bps, int=%u us",
+                  packet_out_len, bandwidth, interval);
+      }
    }
 /*
  *	Display initial message.
@@ -368,7 +370,6 @@ main(int argc, char *argv[]) {
    printf("Ending %s: %u hosts scanned in %.3f seconds (%.2f hosts/sec).  %u responded\n",
           scanner_name, num_hosts, elapsed_seconds, num_hosts/elapsed_seconds,
           responders);
-   printf("maximum iterations=%u\n", max_iter);
    if (debug) {print_times(); printf("main: End\n");}
    return 0;
 }
@@ -732,19 +733,29 @@ print_times(void) {
    struct timeval time_delta2;
 
    Gettimeofday(&time_now);
-   
+/*
+ * We cast the timeval elements to unsigned long because different vendors
+ * use different types for them (int, long, unsigned int and unsigned long).
+ * As long is the widest type, and the values should always be positive, it's
+ * safe to cast to unsigned long.
+ */
    if (first_call) {
       first_call=0;
       time_first.tv_sec  = time_now.tv_sec;
       time_first.tv_usec = time_now.tv_usec;
-      printf("%lu.%.6lu (0.000000) [0.000000]\t", time_now.tv_sec,
-             time_now.tv_usec);
+      printf("%lu.%.6lu (0.000000) [0.000000]\t",
+             (unsigned long)time_now.tv_sec,
+             (unsigned long)time_now.tv_usec);
    } else {
       timeval_diff(&time_now, &time_last, &time_delta1);
       timeval_diff(&time_now, &time_first, &time_delta2);
-      printf("%lu.%.6lu (%lu.%.6lu) [%lu.%.6lu]\t", time_now.tv_sec,
-             time_now.tv_usec, time_delta1.tv_sec, time_delta1.tv_usec,
-             time_delta2.tv_sec, time_delta2.tv_usec);
+      printf("%lu.%.6lu (%lu.%.6lu) [%lu.%.6lu]\t",
+             (unsigned long)time_now.tv_sec,
+             (unsigned long)time_now.tv_usec,
+             (unsigned long)time_delta1.tv_sec,
+             (unsigned long)time_delta1.tv_usec,
+             (unsigned long)time_delta2.tv_sec,
+             (unsigned long)time_delta2.tv_usec);
    }
    time_last.tv_sec  = time_now.tv_sec;
    time_last.tv_usec = time_now.tv_usec;

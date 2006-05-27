@@ -1,7 +1,7 @@
 dnl $Id$
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT([rawip-scan-engine], [1.5], [rawip-scan-engine@nta-monitor.com])
+AC_INIT([rawip-scan-engine], [1.6], [rawip-scan-engine@nta-monitor.com])
 AC_PREREQ(2.59)
 AC_REVISION($Revision$)
 AC_CONFIG_SRCDIR([rawip-scan-engine.c])
@@ -16,6 +16,8 @@ AC_PROG_CC
  fi
 AC_PROG_INSTALL
 AC_PROG_LN_S
+dnl Check endian-ness. MD5 and SHA1 hash functions need to know this.
+AC_C_BIGENDIAN
 
 dnl Checks for libraries.
 dnl Solaris 8 needs nsl and socket.  Linux and {Free,Open}BSD do not.

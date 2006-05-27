@@ -459,8 +459,8 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
       uint16_t len;
    };
    /* Position pseudo header just before the TCP header */
-   struct pseudo_hdr *pseudo = (struct pseudo_hdr *) (buf + sizeof(struct ip) -
-   sizeof(struct pseudo_hdr));
+   struct pseudo_hdr *pseudo = (struct pseudo_hdr *) (buf + sizeof(struct iphdr)
+   - sizeof(struct pseudo_hdr));
    unsigned char *options = (unsigned char *) (buf + sizeof(struct iphdr) +
                                               sizeof(struct tcphdr));
    unsigned char *optptr;

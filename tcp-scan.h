@@ -14,7 +14,7 @@
  */
 
 /* Includes */
-#include <netinet/ip.h>
+#include "ip.h"
 #include "tcp.h"
 #include <sys/ioctl.h>
 #include <net/if.h>

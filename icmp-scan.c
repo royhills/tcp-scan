@@ -272,8 +272,8 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
       uint16_t len;
    };
    /* Position pseudo header just before the UDP header */
-   struct pseudo_hdr *pseudo = (struct pseudo_hdr *) (buf + sizeof(struct ip) -
-   sizeof(struct pseudo_hdr));
+   struct pseudo_hdr *pseudo = (struct pseudo_hdr *) (buf + sizeof(struct iphdr)
+   - sizeof(struct pseudo_hdr));
 /*
  *      If he is NULL, just return with the packet length.
  */
@@ -506,7 +506,8 @@ initialise(void) {
                                     icmp_seq_no);
          if ((pcap_compile(handle,&filter,filter_string,OPTIMISE,netmask)) < 0)
             err_msg("pcap_geterr: %s\n", pcap_geterr(handle));
-         warn_msg("pcap filter string: %s", filter_string);
+         if (verbose)
+            warn_msg("pcap filter string: %s", filter_string);
          free(filter_string);
          break;
       case 13:
@@ -515,7 +516,8 @@ initialise(void) {
                                     icmp_seq_no);
          if ((pcap_compile(handle,&filter,filter_string,OPTIMISE,netmask)) < 0)
             err_msg("pcap_geterr: %s\n", pcap_geterr(handle));
-         warn_msg("pcap filter string: %s", filter_string);
+         if (verbose)
+            warn_msg("pcap filter string: %s", filter_string);
          free(filter_string);
          break;
       case 17:
@@ -524,7 +526,8 @@ initialise(void) {
                                     icmp_seq_no);
          if ((pcap_compile(handle,&filter,filter_string,OPTIMISE,netmask)) < 0)
             err_msg("pcap_geterr: %s\n", pcap_geterr(handle));
-         warn_msg("pcap filter string: %s", filter_string);
+         if (verbose)
+            warn_msg("pcap filter string: %s", filter_string);
          free(filter_string);
          break;
       case 15:
@@ -533,7 +536,8 @@ initialise(void) {
                                     icmp_seq_no);
          if ((pcap_compile(handle,&filter,filter_string,OPTIMISE,netmask)) < 0)
             err_msg("pcap_geterr: %s\n", pcap_geterr(handle));
-         warn_msg("pcap filter string: %s", filter_string);
+         if (verbose)
+            warn_msg("pcap filter string: %s", filter_string);
          free(filter_string);
          break;
       case 32:
@@ -542,7 +546,8 @@ initialise(void) {
                                     icmp_seq_no);
          if ((pcap_compile(handle,&filter,filter_string,OPTIMISE,netmask)) < 0)
             err_msg("pcap_geterr: %s\n", pcap_geterr(handle));
-         warn_msg("pcap filter string: %s", filter_string);
+         if (verbose)
+            warn_msg("pcap filter string: %s", filter_string);
          free(filter_string);
          ip_protocol = UNREACH_PROTO;	/* value to cause proto unreach */
          break;
@@ -552,7 +557,8 @@ initialise(void) {
                                     UNREACH_PORT);
          if ((pcap_compile(handle,&filter,filter_string,OPTIMISE,netmask)) < 0)
             err_msg("pcap_geterr: %s\n", pcap_geterr(handle));
-         warn_msg("pcap filter string: %s", filter_string);
+         if (verbose)
+            warn_msg("pcap filter string: %s", filter_string);
          free(filter_string);
          ip_protocol = 17;	/* UDP */
          break;
