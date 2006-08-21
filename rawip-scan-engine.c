@@ -1,5 +1,5 @@
 /*
- * The RAWIP Scan Engine (rawip-scan-engine) is Copyright (C) 2003-2005 Roy Hills,
+ * The RAWIP Scan Engine (rawip-scan-engine) is Copyright (C) 2003-2006 Roy Hills,
  * NTA Monitor Ltd.
  *
  * $Id$
@@ -241,8 +241,11 @@ main(int argc, char *argv[]) {
 /*
  *	Display initial message.
  */
-   printf("Starting %s %s (%s) with %u hosts\n", scanner_name, scanner_version,
-          PACKAGE_STRING, num_hosts);
+#ifndef LIST_ENTRY_NAME
+#error LIST_ENTRY_NAME must be defined
+#endif
+   printf("Starting %s %s (%s) with %u %s\n", scanner_name, scanner_version,
+          PACKAGE_STRING, num_hosts, LIST_ENTRY_NAME);
 /*
  *	Display the lists if verbose setting is 3 or more.
  */
@@ -1043,7 +1046,7 @@ process_options(int argc, char *argv[]) {
 void
 rawip_scan_version (void) {
    fprintf(stderr, "%s %s (%s)\n\n", scanner_name, scanner_version, PACKAGE_STRING);
-   fprintf(stderr, "Copyright (C) 2003-2005 Roy Hills, NTA Monitor Ltd.\n");
+   fprintf(stderr, "Copyright (C) 2003-2006 Roy Hills, NTA Monitor Ltd.\n");
    fprintf(stderr, "\n");
 /* We use rcsid here to prevent it being optimised away */
    fprintf(stderr, "%s\n", rcsid);

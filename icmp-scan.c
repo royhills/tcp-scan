@@ -1,5 +1,5 @@
 /*
- * The ICMP Scanner (icmp-scan) is Copyright (C) 2005 Roy Hills,
+ * The ICMP Scanner (icmp-scan) is Copyright (C) 2005-2006 Roy Hills,
  * NTA Monitor Ltd.
  *
  * $Id$
