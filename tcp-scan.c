@@ -1390,6 +1390,8 @@ local_process_options(int argc, char *argv[]) {
             interval_len=strlen(interval_str);
             if (interval_str[interval_len-1] == 'u') {
                interval=Strtoul(interval_str, 10);
+            } else if (interval_str[interval_len-1] == 's') {
+               interval=1000000 * Strtoul(interval_str, 10);
             } else {
                interval=1000 * Strtoul(interval_str, 10);
             }

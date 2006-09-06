@@ -679,10 +679,12 @@ usage(int status) {
    fprintf(stderr, "\t\t\tThis controls the outgoing bandwidth usage by limiting\n");
    fprintf(stderr, "\t\t\tthe rate at which packets can be sent.  The packet\n");
    fprintf(stderr, "\t\t\tinterval will be no smaller than this number.\n");
+   fprintf(stderr, "\t\t\tThe interval specified is in milliseconds by default.\n");
+   fprintf(stderr, "\t\t\tif \"u\" is appended to the value, then the interval\n");
+   fprintf(stderr, "\t\t\tis in microseconds, and if \"s\" is appended, the\n");
+   fprintf(stderr, "\t\t\tinterval is in seconds.\n");
    fprintf(stderr, "\t\t\tIf you want to use up to a given bandwidth, then it is\n");
    fprintf(stderr, "\t\t\teasier to use the --bandwidth option instead.\n");
-   fprintf(stderr, "\t\t\tThe interval specified is in milliseconds by default,\n");
-   fprintf(stderr, "\t\t\tor in microseconds if \"u\" is appended to the value.\n");
    fprintf(stderr, "\n--bandwidth=<n> or -B <n> Set desired outbound bandwidth to <n>.\n");
    fprintf(stderr, "\t\t\tThe value is in bits per second by default.  If you\n");
    fprintf(stderr, "\t\t\tappend \"K\" to the value, then the units are kilobits\n");
@@ -984,6 +986,8 @@ process_options(int argc, char *argv[]) {
             interval_len=strlen(interval_str);
             if (interval_str[interval_len-1] == 'u') {
                interval=Strtoul(interval_str, 10);
+            } else if (interval_str[interval_len-1] == 's') {
+               interval=1000000 * Strtoul(interval_str, 10);
             } else {
                interval=1000 * Strtoul(interval_str, 10);
             }
