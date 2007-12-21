@@ -1,5 +1,5 @@
 dnl $Id$
-dnl ike-scan autoconf macros
+dnl tcp-scan autoconf macros
 
 dnl	AC_NTA_CHECK_TYPE -- See if a type exists using reasonable includes
 dnl
