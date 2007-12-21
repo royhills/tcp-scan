@@ -1,0 +1,8 @@
+$Id$
+
+2007-12-21 Roy Hills <Roy.Hills@nta-monitor.com>
+
+	* Converted tcp-scan to GPL license.  Previous versions were
+	  NTA Monitor internal use only.
+
+	  Added files AUTHORS, ChangeLog, NEWS and README.
