@@ -32,7 +32,7 @@
  *
  */
 
-#include "rawip-scan-engine.h"
+#include "tcp-scan.h"
 
 static char rcsid[] = "$Id$";	/* RCS ID for ident(1) */
 

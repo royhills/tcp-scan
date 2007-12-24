@@ -1,5 +1,12 @@
 $Id$
 
+2007-12-24 Roy Hills <Roy.Hills@nta-monitor.com>
+
+	* Removed rawip-scan-engine.c and rawip-scan-engine.h.  Code moved to
+          tcp-scan.c and definitions to tcp-scan.h
+
+	* New source file: utils.c, containing utility functions.
+
 2007-12-21 Roy Hills <Roy.Hills@nta-monitor.com>
 
 	* Converted tcp-scan to GPL license.  Previous versions were

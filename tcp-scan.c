@@ -33,7 +33,6 @@
  * 
  */
 
-#include "rawip-scan-engine.h"
 #include "tcp-scan.h"
 
 static char const rcsid[] = "$Id$";   /* RCS ID for ident(1) */
@@ -66,30 +65,315 @@ int portname_flag=0;			/* Display port names */
 int tcp_flags_flag=0;			/* Specify outbound TCP flags */
 struct tcp_flags_struct tcp_flags;	/* Specified TCP flags */
 char **portnames=NULL;
+unsigned live_count;			/* Number of entries awaiting reply */
 
-extern int verbose;	/* Verbose level */
-extern int debug;	/* Debug flag */
-extern char *local_data;		/* Local data from --data option */
-extern struct host_entry *helist;	/* Array of host entries */
+int verbose = 0;			/* Verbose level */
+int debug = 0;				/* Debug flag */
+char *local_data=NULL;			/* Local data from --data option */
+struct host_entry *helist = NULL;	/* Array of host entries */
 struct host_entry **helistptr;		/* Array of pointers to host entries */
-extern unsigned num_hosts;		/* Number of entries in the list */
-extern unsigned max_iter;		/* Max iterations in find_host() */
-extern pcap_t *handle;			/* pcap handle */
-extern struct host_entry **cursor;
-extern unsigned responders;		/* Number of hosts which responded */
-extern char filename[MAXLINE];
-extern int filename_flag;
-extern int random_flag;			/* Randomise the list */
-extern int numeric_flag;		/* IP addresses only */
-extern int ipv6_flag;			/* IPv6 */
-extern unsigned bandwidth;
-extern unsigned interval;
+unsigned num_hosts = 0;			/* Number of entries in the list */
+unsigned max_iter;			/* Max iterations in find_host() */
+pcap_t *handle;				/* pcap handle */
+struct host_entry **cursor;		/* Pointer to current host entry ptr */
+unsigned responders = 0;		/* Number of hosts which responded */
+char filename[MAXLINE];
+int filename_flag=0;
+int random_flag=0;			/* Randomise the list */
+int numeric_flag=0;			/* IP addresses only */
+int ipv6_flag=0;			/* IPv6 */
+unsigned bandwidth=DEFAULT_BANDWIDTH;	/* Bandwidth in bits per sec */
+unsigned interval=0;
 
 static uint32_t source_address;
-extern int pcap_fd;			/* pcap File Descriptor */
+int pcap_fd;				/* pcap File Descriptor */
 static size_t ip_offset;		/* Offset to IP header in pcap pkt */
 static uint16_t *port_list=NULL;
 static char *ga_err_msg;		/* getaddrinfo error message */
+
+int
+main(int argc, char *argv[]) {
+   int sockfd;                  /* IP socket file descriptor */
+   struct sockaddr_in sa_peer;
+   struct timeval now;
+   unsigned char packet_in[MAXIP];      /* Received packet */
+   struct timeval diff;         /* Difference between two timevals */
+   unsigned select_timeout;     /* Select timeout */
+   unsigned long long loop_timediff;    /* Time since last packet sent in us */
+   unsigned long long host_timediff; /* Time since last pkt sent to this host (us) */
+   struct timeval last_packet_time;     /* Time last packet was sent */
+   int req_interval;            /* Requested per-packet interval */
+   int cum_err=0;               /* Cumulative timing error */
+   struct timeval start_time;   /* Program start time */
+   struct timeval end_time;     /* Program end time */
+   struct timeval elapsed_time; /* Elapsed time as timeval */
+   double elapsed_seconds;      /* Elapsed time in seconds */
+   static int reset_cum_err;
+   static int pass_no;
+   int first_timeout=1;
+   const int on = 1;            /* For setsockopt */
+   int i;
+/*
+ *      Process options.
+ */
+   process_options(argc, argv);
+/*
+ *      Get program start time for statistics displayed on completion.
+ */
+   Gettimeofday(&start_time);
+   if (debug) {print_times(); printf("main: Start\n");}
+/*
+ *      Create raw IP socket and set IP_HDRINCL
+ */
+   if ((sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0)
+      err_sys("socket");
+   if ((setsockopt(sockfd, IPPROTO_IP, IP_HDRINCL, &on, sizeof(on))) != 0)
+      err_sys("setsockopt");
+   if ((setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &on, sizeof(on))) != 0)
+      err_sys("setsockopt");
+/*
+ *      Call protocol-specific initialisation routine to perform any
+ *      initial setup required.
+ */
+   initialise();
+/*
+ *      Drop privileges.
+ */
+   if ((setuid(getuid())) < 0) {
+      err_sys("setuid");
+   }
+/*
+ *      If we're not reading from a file, then we must have some hosts
+ *      given as command line arguments.
+ */
+   if (!filename_flag)
+      if ((argc - optind) < 1)
+         usage(EXIT_FAILURE);
+/*
+ *      Populate the list from the specified file if --file was specified, or
+ *      otherwise from the remaining command line arguments.
+ */
+   if (filename_flag) { /* Populate list from file */
+      FILE *fp;
+      char line[MAXLINE];
+      char *cp;
+
+      if ((strcmp(filename, "-")) == 0) {       /* Filename "-" means stdin */
+         if ((fp = fdopen(0, "r")) == NULL) {
+            err_sys("fdopen");
+         }
+      } else {
+         if ((fp = fopen(filename, "r")) == NULL) {
+            err_sys("fopen");
+         }
+      }
+
+      while (fgets(line, MAXLINE, fp)) {
+         cp = line;
+         while (!isspace(*cp) && *cp != '\0')
+            cp++;
+         *cp = '\0';
+         add_host(line, timeout);
+      }
+      fclose(fp);
+   } else {             /* Populate list from command line arguments */
+      argv=&argv[optind];
+      while (*argv) {
+         add_host(*argv, timeout);
+         argv++;
+      }
+   }
+/*
+ *      Check that we have at least one entry in the list.
+ */
+   if (!num_hosts)
+      err_msg("No hosts to process.");
+/*
+ *      Check that the combination of specified options and arguments is
+ *      valid.
+ */
+   if (interval && bandwidth != DEFAULT_BANDWIDTH)
+      err_msg("ERROR: You cannot specify both --bandwidth and --interval.");
+/*
+ *      Create and initialise array of pointers to host entries.
+ */
+   helistptr = Malloc(num_hosts * sizeof(struct host_entry *));
+   for (i=0; i<num_hosts; i++)
+      helistptr[i] = &helist[i];
+/*
+ *      Randomise the list if required.
+ */
+   if (random_flag) {
+      unsigned seed;
+      struct timeval tv;
+      int r;
+      struct host_entry *temp;
+
+      Gettimeofday(&tv);
+      seed = tv.tv_usec ^ getpid();
+      srandom(seed);
+
+      for (i=num_hosts-1; i>0; i--) {
+         r = random() % (i+1);     /* Random number 0<=r<i */
+         temp = helistptr[i];
+         helistptr[i] = helistptr[r];
+         helistptr[r] = temp;
+      }
+   }
+/*
+ *      Set current host pointer (cursor) to start of list, zero
+ *      last packet sent time, and set last receive time to now.
+ */
+   live_count = num_hosts;
+   cursor = helistptr;
+   last_packet_time.tv_sec=0;
+   last_packet_time.tv_usec=0;
+/*
+ *      Calculate the required interval to achieve the required outgoing
+ *      bandwidth unless the interval was manually specified with --interval.
+ */
+   if (!interval) {
+      size_t packet_out_len;
+
+      packet_out_len=send_packet(0, NULL, 1, NULL); /* Get packet data size */
+      if (packet_out_len < MINIMUM_FRAME_SIZE)
+         packet_out_len = MINIMUM_FRAME_SIZE;   /* Adjust to minimum size */
+      packet_out_len += PACKET_OVERHEAD;        /* Add layer 2 overhead */
+      interval = ((ARP_UINT64)packet_out_len * 8 * 1000000) / bandwidth;
+      if (verbose) {
+         warn_msg("DEBUG: Ether pkt len=%u bytes, bandwidth=%u bps, int=%u us",
+                  packet_out_len, bandwidth, interval);
+      }
+   }
+/*
+ *      Display initial message.
+ */
+   printf("Starting %s with %u ports\n", PACKAGE_STRING, num_hosts);
+/*
+ *      Display the lists if verbose setting is 3 or more.
+ */
+   if (verbose > 2)
+      dump_list();
+/*
+ *      Main loop: send packets to all hosts in order until a response
+ *      has been received or the host has exhausted its retry limit.
+ *
+ *      The loop exits when all hosts have either responded or timed out.
+ */
+   reset_cum_err = 1;
+   req_interval = interval;
+   while (live_count) {
+      if (debug) {print_times(); printf("main: Top of loop.\n");}
+/*
+ *      Obtain current time and calculate deltas since last packet and
+ *      last packet to this host.
+ */
+      Gettimeofday(&now);
+/*
+ *      If the last packet was sent more than interval us ago, then we can
+ *      potentially send a packet to the current host.
+ */
+      timeval_diff(&now, &last_packet_time, &diff);
+      loop_timediff = (unsigned long long)1000000*diff.tv_sec + diff.tv_usec;
+      if (loop_timediff >= req_interval) {
+         if (debug) {print_times(); printf("main: Can send packet now.  loop_timediff=%llu\n", loop_timediff);}
+/*
+ *      If the last packet to this host was sent more than the current
+ *      timeout for this host us ago, then we can potentially send a packet
+ *      to it.
+ */
+         timeval_diff(&now, &((*cursor)->last_send_time), &diff);
+         host_timediff = (unsigned long long)1000000*diff.tv_sec + diff.tv_usec;
+         if (host_timediff >= (*cursor)->timeout) {
+            if (reset_cum_err) {
+               if (debug) {print_times(); printf("main: Reset cum_err\n");}
+               cum_err = 0;
+               req_interval = interval;
+               reset_cum_err = 0;
+            } else {
+               cum_err += loop_timediff - interval;
+               if (req_interval >= cum_err) {
+                  req_interval = req_interval - cum_err;
+               } else {
+                  req_interval = 0;
+               }
+            }
+            if (debug) {print_times(); printf("main: Can send packet to host %d now.  host_timediff=%llu, timeout=%u, req_interval=%d, cum_err=%d\n", (*cursor)->n, host_timediff, (*cursor)->timeout, req_interval, cum_err);}
+            select_timeout = req_interval;
+/*
+ *      If we've exceeded our retry limit, then this host has timed out so
+ *      remove it from the list.  Otherwise, increase the timeout by the
+ *      backoff factor if this is not the first packet sent to this host
+ *      and send a packet.
+ */
+            if (verbose && (*cursor)->num_sent > pass_no) {
+               warn_msg("---\tPass %d complete", pass_no+1);
+               pass_no = (*cursor)->num_sent;
+            }
+            if ((*cursor)->num_sent >= retry) {
+               if (verbose > 1)
+                  warn_msg("---\tRemoving host entry %u (%s) - Timeout", (*cursor)->n, my_ntoa((*cursor)->addr,ipv6_flag));
+               if (debug) {print_times(); printf("main: Timing out host %d.\n", (*cursor)->n);}
+               remove_host(cursor);     /* Automatically calls advance_cursor() */
+               if (first_timeout) {
+                  timeval_diff(&now, &((*cursor)->last_send_time), &diff);
+                  host_timediff = (unsigned long long)1000000*diff.tv_sec +
+                                  diff.tv_usec;
+                  while (host_timediff >= (*cursor)->timeout && live_count) {
+                     if ((*cursor)->live) {
+                        if (verbose > 1)
+                           warn_msg("---\tRemoving host %u (%s) - Catch-Up Timeout", (*cursor)->n, my_ntoa((*cursor)->addr,ipv6_flag));
+                        remove_host(cursor);
+                     } else {
+                        advance_cursor();
+                     }
+                     timeval_diff(&now, &((*cursor)->last_send_time), &diff);
+                     host_timediff = (unsigned long long)1000000*diff.tv_sec +
+                                     diff.tv_usec;
+                  }
+                  first_timeout=0;
+               }
+               Gettimeofday(&last_packet_time);
+            } else {    /* Retry limit not reached for this host */
+               if ((*cursor)->num_sent)
+                  (*cursor)->timeout *= backoff_factor;
+               send_packet(sockfd, *cursor, ip_protocol, &last_packet_time);
+               advance_cursor();
+            }
+         } else {       /* We can't send a packet to this host yet */
+/*
+ *      Note that there is no point calling advance_cursor() here because if
+ *      host n is not ready to send, then host n+1 will not be ready either.
+ */
+            select_timeout = (*cursor)->timeout - host_timediff;
+            reset_cum_err = 1;  /* Zero cumulative error */
+            if (debug) {print_times(); printf("main: Can't send packet to host %d yet. host_timediff=%llu\n", (*cursor)->n, host_timediff);}
+         } /* End If */
+      } else {          /* We can't send a packet yet */
+         select_timeout = req_interval - loop_timediff;
+         if (debug) {print_times(); printf("main: Can't send packet yet.  loop_timediff=%llu\n", loop_timediff);}
+      } /* End If */
+
+      recvfrom_wto(pcap_fd, packet_in, MAXIP, (struct sockaddr *)&sa_peer,
+                   select_timeout);
+   } /* End While */
+
+   printf("\n");        /* Ensure we have a blank line */
+
+   close(sockfd);
+   clean_up();
+
+   Gettimeofday(&end_time);
+   timeval_diff(&end_time, &start_time, &elapsed_time);
+   elapsed_seconds = (elapsed_time.tv_sec*1000 +
+                      elapsed_time.tv_usec/1000) / 1000.0;
+
+   printf("Ending %s: %u hosts scanned in %.3f seconds (%.2f hosts/sec).  %u responded\n",
+          PACKAGE_STRING, num_hosts, elapsed_seconds, num_hosts/elapsed_seconds,
+          responders);
+   if (debug) {print_times(); printf("main: End\n");}
+   return 0;
+}
 
 /*
  *	display_packet -- Check and display received packet
@@ -127,7 +411,7 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
  *	Set msg to the IP address of the host entry, plus the address of the
  *	responder if different, and a tab.
  */
-   msg = make_message("%s\t", my_ntoa(he->addr));
+   msg = make_message("%s\t", my_ntoa(he->addr,ipv6_flag));
    if ((he->addr).v4.s_addr != recv_addr->s_addr) {	/* XXXX */
       cp = msg;
       msg = make_message("%s(%s) ", cp, inet_ntoa(*recv_addr));
@@ -632,9 +916,9 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
 /*
  *	Send the packet.
  */
-   if (debug) {print_times(); printf("send_packet: #%u to host entry %u (%s) tmo %d\n", he->num_sent, he->n, my_ntoa(he->addr), he->timeout);}
+   if (debug) {print_times(); printf("send_packet: #%u to host entry %u (%s) tmo %d\n", he->num_sent, he->n, my_ntoa(he->addr,ipv6_flag), he->timeout);}
    if (verbose > 1)
-      warn_msg("---\tSending packet #%u to host entry %u (%s) tmo %d", he->num_sent, he->n, my_ntoa(he->addr), he->timeout);
+      warn_msg("---\tSending packet #%u to host entry %u (%s) tmo %d", he->num_sent, he->n, my_ntoa(he->addr,ipv6_flag), he->timeout);
    if ((sendto(s, buf, buflen, 0, (struct sockaddr *) &sa_peer, sa_peer_len)) < 0) {
       err_sys("sendto");
    }
@@ -817,40 +1101,73 @@ clean_up(void) {
 }
 
 /*
- *      local_version -- Scanner-specific version function.
+ *	usage -- display usage message and exit
  *
- *      Inputs:
+ *	Inputs:
  *
- *      None.
- *
- *      Returns:
- *
- *      None.
- *
- *      This should output the scanner-specific version number to stderr.
+ *	status	Status value to pass to exit()
  */
 void
-local_version(void) {
-/* We use rcsid here to prevent it being optimised away */
-   fprintf(stderr, "%s\n", rcsid);
-}
-
-/*
- *      local_help -- Scanner-specific help function.
- *
- *      Inputs:
- *
- *      None.
- *
- *      Returns:
- *
- *      None.
- *
- *      This should output the scanner-specific usage for the --data option
- *      (if any).
- */
-void
-local_help(void) {
+usage(int status) {
+   fprintf(stderr, "Usage: tcp-scan [options] [hosts...]\n");
+   fprintf(stderr, "\n");
+   fprintf(stderr, "Hosts are specified on the command line unless the --file option is specified.\n");
+   fprintf(stderr, "Each host uses %u bytes of memory.\n",
+           sizeof(struct host_entry) + sizeof(struct host_entry *));
+   fprintf(stderr, "\n");
+   fprintf(stderr, "Options:\n");
+   fprintf(stderr, "\n");
+   fprintf(stderr, "--help or -h\t\tDisplay this usage message and exit.\n");
+   fprintf(stderr, "\n--file=<fn> or -f <fn>\tRead hostnames or addresses from the specified file\n");
+   fprintf(stderr, "\t\t\tinstead of from the command line. One name or IP\n");
+   fprintf(stderr, "\t\t\taddress per line.  Use \"-\" for standard input.\n");
+   fprintf(stderr, "\n--protocol=<p> or -p <p>\tSet IP protocol to <p>\n");
+   fprintf(stderr, "\n--retry=<n> or -r <n>\tSet total number of attempts per host to <n>,\n");
+   fprintf(stderr, "\t\t\tdefault=%d.\n", retry);
+   fprintf(stderr, "\n--timeout=<n> or -t <n>\tSet initial per host timeout to <n> ms, default=%d.\n", timeout);
+   fprintf(stderr, "\t\t\tThis timeout is for the first packet sent to each host.\n");
+   fprintf(stderr, "\t\t\tsubsequent timeouts are multiplied by the backoff\n");
+   fprintf(stderr, "\t\t\tfactor which is set with --backoff.\n");
+   fprintf(stderr, "\n--interval=<n> or -i <n> Set minimum packet interval to <n> ms, default=%d.\n", interval/1000);
+   fprintf(stderr, "\t\t\tThis controls the outgoing bandwidth usage by limiting\n");
+   fprintf(stderr, "\t\t\tthe rate at which packets can be sent.  The packet\n");
+   fprintf(stderr, "\t\t\tinterval will be no smaller than this number.\n");
+   fprintf(stderr, "\t\t\tThe interval specified is in milliseconds by default.\n");
+   fprintf(stderr, "\t\t\tif \"u\" is appended to the value, then the interval\n");
+   fprintf(stderr, "\t\t\tis in microseconds, and if \"s\" is appended, the\n");
+   fprintf(stderr, "\t\t\tinterval is in seconds.\n");
+   fprintf(stderr, "\t\t\tIf you want to use up to a given bandwidth, then it is\n");
+   fprintf(stderr, "\t\t\teasier to use the --bandwidth option instead.\n");
+   fprintf(stderr, "\n--bandwidth=<n> or -B <n> Set desired outbound bandwidth to <n>.\n");
+   fprintf(stderr, "\t\t\tThe value is in bits per second by default.  If you\n");
+   fprintf(stderr, "\t\t\tappend \"K\" to the value, then the units are kilobits\n");
+   fprintf(stderr, "\t\t\tper sec; and if you append \"M\" to the value, the\n");
+   fprintf(stderr, "\t\t\tunits are megabits per second.\n");
+   fprintf(stderr, "\t\t\tThe \"K\" and \"M\" suffixes represent the decimal, not\n");
+   fprintf(stderr, "\t\t\tbinary, multiples.  So 64K is 64000, not 65536.\n");
+   fprintf(stderr, "\t\t\tYou cannot specify both --interval and --bandwidth\n");
+   fprintf(stderr, "\t\t\tbecause they are just different ways to change the\n");
+   fprintf(stderr, "\t\t\tsame parameter.\n");
+   fprintf(stderr, "\n--backoff=<b> or -b <b>\tSet timeout backoff factor to <b>, default=%.2f.\n", backoff_factor);
+   fprintf(stderr, "\t\t\tThe per-host timeout is multiplied by this factor\n");
+   fprintf(stderr, "\t\t\tafter each timeout.  So, if the number of retrys\n");
+   fprintf(stderr, "\t\t\tis 3, the initial per-host timeout is 500ms and the\n");
+   fprintf(stderr, "\t\t\tbackoff factor is 1.5, then the first timeout will be\n");
+   fprintf(stderr, "\t\t\t500ms, the second 750ms and the third 1125ms.\n");
+   fprintf(stderr, "\n--verbose or -v\t\tDisplay verbose progress messages.\n");
+   fprintf(stderr, "\t\t\tUse more than once for greater effect:\n");
+   fprintf(stderr, "\t\t\t1 - Show when hosts are removed from the list and\n");
+   fprintf(stderr, "\t\t\t    when packets with invalid cookies are received.\n");
+   fprintf(stderr, "\t\t\t2 - Show each packet sent and received.\n");
+   fprintf(stderr, "\t\t\t3 - Display the host list before\n");
+   fprintf(stderr, "\t\t\t    scanning starts.\n");
+   fprintf(stderr, "\n--version or -V\t\tDisplay program version and exit.\n");
+   fprintf(stderr, "\n--random or -R\t\tRandomise the host list.\n");
+   fprintf(stderr, "\n--numeric or -N\t\tIP addresses only, no hostnames.\n");
+   fprintf(stderr, "\t\t\tWith this option, all hosts must be specified as\n");
+   fprintf(stderr, "\t\t\tIP addresses.  Hostnames are not permitted.\n");
+   fprintf(stderr, "\n--ipv6 or -6\t\tUse IPv6 protocol. Default is IPv4.\n");
+/* scanner-specific help */
    fprintf(stderr, "\n--data=<p> or -D <p>\tSpecify TCP destination port(s).\n");
    fprintf(stderr, "\t\t\tThis option can be a single port, a list of ports\n");
    fprintf(stderr, "\t\t\tseparated by commas, or an inclusive range with the\n");
@@ -921,33 +1238,28 @@ local_help(void) {
    fprintf(stderr, "\t\t\tfrom the set of: CWR,ECN,URG,ACK,PSH,RST,SYN,FIN.\n");
    fprintf(stderr, "\t\t\tIf this option is not specified, the flags default\n");
    fprintf(stderr, "\t\t\tto SYN.\n");
+   fprintf(stderr, "\n");
+   fprintf(stderr, "Report bugs or send suggestions to %s\n", PACKAGE_BUGREPORT);
+   exit(status);
 }
 
 /*
- *      local_add_host -- Protocol-specific add host routine.
+ *	add_host -- Add a new host to the list.
  *
- *      Inputs:
+ *	Inputs:
  *
- *      name = The Name or IP address of the host.
- *      timeout = The initial host timeout in ms.
+ *	name = The Name or IP address of the host.
+ *	timeout = The initial host timeout in ms.
  *
- *      Returns:
+ *	Returns:
  *
- *      0 (Zero) if this function doesn't need to do anything, or
- *      1 (One) if this function replaces the generic add_host function.
+ *	None.
  *
  *	This function is called before the helistptr array is created, so
  *	we use the helist array directly.
- *
- *      This routine is called once for each specified host.
- *
- *      This protocol-specific add host routine can replace the generic
- *      rawip-scan add-host routine if required.  If it is to replace the
- *      generic routine, then it must perform all of the add_host functions
- *      and return 1.  Otherwise, it must do nothing and return 0.
  */
-int
-local_add_host(char *name, unsigned timeout) {
+void
+add_host(char *name, unsigned timeout) {
    static int first_time_through=1;
    char *cp;
 
@@ -1000,8 +1312,105 @@ local_add_host(char *name, unsigned timeout) {
       while (port_list[i])
          add_host_port(name, timeout, port_list[i++]);
    }
+}
 
-   return 1;	/* Replace generic add_host() function */
+/*
+ * 	remove_host -- Remove the specified host from the list
+ *
+ *	inputs:
+ *
+ *	he = Pointer to host entry to remove.
+ *
+ *	If the host being removed is the one pointed to by the cursor, this
+ *	function updates cursor so that it points to the next entry.
+ */
+void
+remove_host(struct host_entry **he) {
+   if ((*he)->live) {
+      (*he)->live = 0;
+      live_count--;
+      if (*he == *cursor)
+         advance_cursor();
+      if (debug) {print_times(); printf("remove_host: live_count now %d\n", live_count);}
+   } else {
+      if (verbose > 1)
+         warn_msg("***\tremove_host called on non-live host entry: SHOULDN'T HAPPEN");
+   }
+}
+
+/*
+ *	advance_cursor -- Advance the cursor to point at next live entry
+ *
+ *	Inputs:
+ *
+ *	None.
+ *
+ *	Does nothing if there are no live entries in the list.
+ */
+void
+advance_cursor(void) {
+   if (live_count) {
+      do {
+         if (cursor == (helistptr+(num_hosts-1)))
+            cursor = helistptr;	/* Wrap round to beginning */
+         else
+            cursor++;
+      } while (!(*cursor)->live);
+   } /* End If */
+   if (debug) {print_times(); printf("advance_cursor: cursor now %d\n", (*cursor)->n);}
+}
+
+/*
+ *	recvfrom_wto -- Receive packet with timeout
+ *
+ *	Inputs:
+ *
+ *	s	= Socket file descriptor.
+ *	buf	= Buffer to receive data read from socket.
+ *	len	= Size of buffer.
+ *	saddr	= Socket structure.
+ *	tmo	= Select timeout in us.
+ *
+ *	Returns number of characters received, or -1 for timeout.
+ */
+void
+recvfrom_wto(int s, unsigned char *buf, int len, struct sockaddr *saddr,
+             int tmo) {
+   fd_set readset;
+   struct timeval to;
+   int n;
+
+   FD_ZERO(&readset);
+   FD_SET(s, &readset);
+   to.tv_sec  = tmo/1000000;
+   to.tv_usec = (tmo - 1000000*to.tv_sec);
+   n = select(s+1, &readset, NULL, NULL, &to);
+   if (debug) {print_times(); printf("recvfrom_wto: select end, tmo=%d, n=%d\n", tmo, n);}
+   if (n < 0) {
+      err_sys("select");
+   } else if (n == 0) {
+      return;	/* Timeout */
+   }
+   if ((pcap_dispatch(handle, -1, callback, NULL)) < 0)
+      err_sys("pcap_dispatch: %s\n", pcap_geterr(handle));
+}
+
+/*
+ *	dump_list -- Display contents of host list for debugging
+ *
+ *	Inputs:
+ *
+ *	None.
+ */
+void
+dump_list(void) {
+   int i;
+
+   printf("Host List:\n\n");
+   printf("Entry\tIP Address\n");
+   for (i=0; i<num_hosts; i++)
+      printf("%u\t%s\n", helistptr[i]->n, my_ntoa(helistptr[i]->addr,ipv6_flag));
+   printf("\nTotal of %u host entries.\n\n", num_hosts);
 }
 
 void
@@ -1064,29 +1473,6 @@ add_host_port(char *name, unsigned timeout, unsigned port) {
    he->dport=port;
 }
 
-/*
- *      Convert a two-digit hex string with to unsigned int.
- *      E.g. "0A" would return 10.
- *      Note that this function does no sanity checking, it's up to the
- *      caller to ensure that *cptr points to at least two hex digits.
- *      This function is a modified version of hstr_i at www.snippets.org.
- */
-unsigned int hstr_i(char *cptr)
-{
-      unsigned int i;
-      unsigned int j = 0;
-      int k;
-
-      for (k=0; k<2; k++) {
-            i = *cptr++ - '0';
-            if (9 < i)
-                  i -= 7;
-            j <<= 4;
-            j |= (i & 0x0f);
-      }
-      return(j);
-}
-
 /* Standard BSD internet checksum routine */
 uint16_t in_cksum(uint16_t *ptr,int nbytes) {
 
@@ -1146,44 +1532,43 @@ uint32_t get_source_ip(char *devname) {
 }
 
 /*
- *	local_find_host -- Protocol-specific find host routine.
+ *	find_host	-- Find a host in the list
  *
  *	Inputs:
  *
- *	ptr	Pointer to the host entry that was found, or NULL if not found
- *      he      Pointer to the current position in the list.  Search runs
- *              backwards starting from this point.
- *      addr    The source IP address that the packet came from.
- *      packet_in The received packet data.
- *      n       The length of the received packet.
+ *	he 	Pointer to the current position in the list.  Search runs
+ *		backwards starting from this point.
+ *	addr 	The source IP address that the packet came from.
+ *	packet_in The received packet data.
+ *	n	The length of the received packet.
  *
- *	Returns:
+ *	Returns a pointer to the host entry associated with the specified IP
+ *	or NULL if no match found.
  *
- *	0 (Zero) if this function doesn't need to do anything, or
- *	1 (One) if this function replaces the generic add_host function.
- *
- *	This routine is called every time a packet is received.
- *
- *	This protocol-specific find host routine can replace the generic
- *	rawip-scan find-host routine if required.  If it is to replace the
- *	generic routine, then it must perform all of the find_host functions
- *	and return 1.  Otherwise, it must do nothing and return 0.
+ *	This routine will normally find the host by IP address by comparing
+ *	"addr" against "he->addr" for each entry in the list.  In this case,
+ *	"packet_in" and "n" are not used.  However, it is  possible for
+ *	the protocol-specific "local_find_host()" routine to override this
+ *	generic routine, and the protocol specific routine may use "packet_in"
+ *	and "n".
  */
-int
-local_find_host(struct host_entry **ptr, struct host_entry **he,
-                struct in_addr *addr, const unsigned char *packet_in, int n) {
-   struct iphdr *iph;
-   struct tcphdr *tcph;
+struct host_entry *
+find_host(struct host_entry **he, struct in_addr *addr,
+          const unsigned char *packet_in, int n) {
    struct host_entry **p;
    int found = 0;
-   unsigned iterations = 0;     /* Used for debugging */
+   unsigned iterations = 0;	/* Used for debugging */
+/*
+ *	Return with the result from local_find_host if the local find_host
+ *	function replaces this one.
+ */
+   struct iphdr *iph;
+   struct tcphdr *tcph;
 /*
  *      Don't try to match if packet is too short.
  */
-   if (n < ip_offset + sizeof(struct iphdr) + sizeof(struct tcphdr)) {
-      *ptr = NULL;
-      return 1;
-   }
+   if (n < ip_offset + sizeof(struct iphdr) + sizeof(struct tcphdr))
+      return NULL;
 /*
  *      Overlay IP and TCP headers on packet buffer.
  *      ip_offset is size of layer-2 header.
@@ -1196,10 +1581,8 @@ local_find_host(struct host_entry **ptr, struct host_entry **he,
  *      Don't try to match if host ptr is NULL.
  *      This should never happen, but we check just in case.
  */
-   if (*he == NULL) {
-      *ptr = NULL;
-      return 1;
-   }
+   if (*he == NULL)
+      return NULL;
 /*
  *	Try to match against out host list.
  */
@@ -1224,11 +1607,9 @@ local_find_host(struct host_entry **ptr, struct host_entry **he,
       max_iter=iterations;
 
    if (found)
-      *ptr = *p;
+      return *p;
    else
-      *ptr = NULL;
-
-   return 1;
+      return NULL;
 }
 
 /*
@@ -1307,6 +1688,126 @@ callback(u_char *args, const struct pcap_pkthdr *header,
  */
       if (verbose)
          warn_msg("---\tIgnoring %d bytes from unknown host %s", n, inet_ntoa(source_ip));
+   }
+}
+
+/*
+ *	process_options	--	Process options and arguments.
+ *
+ *	Inputs:
+ *
+ *	argc	Command line arg count
+ *	argv	Command line args
+ *
+ *	Returns:
+ *
+ *	None.
+ */
+void
+process_options(int argc, char *argv[]) {
+   struct option long_options[] = {
+      {"file", required_argument, 0, 'f'},
+      {"help", no_argument, 0, 'h'},
+      {"protocol", required_argument, 0, 'p'},
+      {"retry", required_argument, 0, 'r'},
+      {"timeout", required_argument, 0, 't'},
+      {"interval", required_argument, 0, 'i'},
+      {"backoff", required_argument, 0, 'b'},
+      {"verbose", no_argument, 0, 'v'},
+      {"version", no_argument, 0, 'V'},
+      {"debug", no_argument, 0, 'd'},
+      {"data", required_argument, 0, 'D'},
+      {"random", no_argument, 0, 'R'},
+      {"numeric", no_argument, 0, 'N'},
+      {"ipv6", no_argument, 0, '6'},
+      {"bandwidth", required_argument, 0, 'B'},
+      {0, 0, 0, 0}
+   };
+   const char *short_options = "f:hp:r:t:i:b:vVdD:N6B:";
+   int arg;
+   int options_index=0;
+/*
+ * Return immediately if the local process_options function replaces this
+ * generic one.
+ */
+   if (local_process_options(argc, argv))
+      return;
+
+   while ((arg=getopt_long_only(argc, argv, short_options, long_options, &options_index)) != -1) {
+      switch (arg) {
+         char interval_str[MAXLINE];    /* --interval argument */
+         size_t interval_len;   /* --interval argument length */
+         char bandwidth_str[MAXLINE];   /* --bandwidth argument */
+         size_t bandwidth_len;  /* --bandwidth argument length */
+
+         case 'f':	/* --file */
+            strncpy(filename, optarg, MAXLINE);
+            filename_flag=1;
+            break;
+         case 'h':	/* --help */
+            usage(EXIT_SUCCESS);
+            break;
+         case 'p':	/* --protocol */
+            ip_protocol=Strtoul(optarg, 10);
+            break;
+         case 'r':	/* --retry */
+            retry=Strtoul(optarg, 10);
+            break;
+         case 't':	/* --timeout */
+            timeout=Strtoul(optarg, 10);
+            break;
+         case 'i':	/* --interval */
+            strncpy(interval_str, optarg, MAXLINE);
+            interval_len=strlen(interval_str);
+            if (interval_str[interval_len-1] == 'u') {
+               interval=Strtoul(interval_str, 10);
+            } else if (interval_str[interval_len-1] == 's') {
+               interval=1000000 * Strtoul(interval_str, 10);
+            } else {
+               interval=1000 * Strtoul(interval_str, 10);
+            }
+            break;
+         case 'b':	/* --backoff */
+            backoff_factor=atof(optarg);
+            break;
+         case 'v':	/* --verbose */
+            verbose++;
+            break;
+         case 'V':	/* --version */
+            rawip_scan_version();
+            exit(0);
+            break;
+         case 'd':	/* --debug */
+            debug++;
+            break;
+         case 'D':	/* --data */
+            local_data = Malloc(strlen(optarg)+1);
+            strcpy(local_data, optarg);
+            break;
+         case 'R':      /* --random */
+            random_flag=1;
+            break;
+         case 'N':	/* --numeric */
+            numeric_flag=1;
+            break;
+         case '6':      /* --ipv6 */
+            ipv6_flag=1;
+            break;
+         case 'B':      /* --bandwidth */
+            strncpy(bandwidth_str, optarg, MAXLINE);
+            bandwidth_len=strlen(bandwidth_str);
+            if (bandwidth_str[bandwidth_len-1] == 'M') {
+               bandwidth=1000000 * Strtoul(bandwidth_str, 10);
+            } else if (bandwidth_str[bandwidth_len-1] == 'K') {
+               bandwidth=1000 * Strtoul(bandwidth_str, 10);
+            } else {
+               bandwidth=Strtoul(bandwidth_str, 10);
+            }
+            break;
+         default:	/* Unknown option */
+            usage(EXIT_FAILURE);
+            break;
+      }
    }
 }
 
@@ -1526,6 +2027,34 @@ local_process_options(int argc, char *argv[]) {
       }
    }
    return 1;	/* Replace generic process_options() function */
+}
+
+/*
+ *	rawip_scan_version -- display version information
+ *
+ *	Inputs:
+ *
+ *	None.
+ *
+ *	This displays the rawip-scan version information and also calls the
+ *	protocol-specific version function to display the protocol-specific
+ *	version information.
+ */
+void
+rawip_scan_version (void) {
+   fprintf(stderr, "%s\n\n", PACKAGE_STRING);
+   fprintf(stderr, "Copyright (C) 2003-2007 Roy Hills, NTA Monitor Ltd.\n");
+   fprintf(stderr, "tcp-scan comes with NO WARRANTY to the extent permitted by law.\n");
+   fprintf(stderr, "You may redistribute copies of arp-scan under the terms of the GNU\n");
+   fprintf(stderr, "General Public License.\n");
+   fprintf(stderr, "For more information about these matters, see the file named COPYING.\n");
+   fprintf(stderr, "\n");
+   fprintf(stderr, "%s\n", pcap_lib_version());
+/* We use rcsid here to prevent it being optimised away */
+   fprintf(stderr, "%s\n", rcsid);
+   error_use_rcsid();
+   wrappers_use_rcsid();
+   utils_use_rcsid();
 }
 
 /*
