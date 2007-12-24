@@ -1544,13 +1544,6 @@ uint32_t get_source_ip(char *devname) {
  *
  *	Returns a pointer to the host entry associated with the specified IP
  *	or NULL if no match found.
- *
- *	This routine will normally find the host by IP address by comparing
- *	"addr" against "he->addr" for each entry in the list.  In this case,
- *	"packet_in" and "n" are not used.  However, it is  possible for
- *	the protocol-specific "local_find_host()" routine to override this
- *	generic routine, and the protocol specific routine may use "packet_in"
- *	and "n".
  */
 struct host_entry *
 find_host(struct host_entry **he, struct in_addr *addr,
@@ -1558,10 +1551,6 @@ find_host(struct host_entry **he, struct in_addr *addr,
    struct host_entry **p;
    int found = 0;
    unsigned iterations = 0;	/* Used for debugging */
-/*
- *	Return with the result from local_find_host if the local find_host
- *	function replaces this one.
- */
    struct iphdr *iph;
    struct tcphdr *tcph;
 /*
@@ -1705,132 +1694,6 @@ callback(u_char *args, const struct pcap_pkthdr *header,
  */
 void
 process_options(int argc, char *argv[]) {
-   struct option long_options[] = {
-      {"file", required_argument, 0, 'f'},
-      {"help", no_argument, 0, 'h'},
-      {"protocol", required_argument, 0, 'p'},
-      {"retry", required_argument, 0, 'r'},
-      {"timeout", required_argument, 0, 't'},
-      {"interval", required_argument, 0, 'i'},
-      {"backoff", required_argument, 0, 'b'},
-      {"verbose", no_argument, 0, 'v'},
-      {"version", no_argument, 0, 'V'},
-      {"debug", no_argument, 0, 'd'},
-      {"data", required_argument, 0, 'D'},
-      {"random", no_argument, 0, 'R'},
-      {"numeric", no_argument, 0, 'N'},
-      {"ipv6", no_argument, 0, '6'},
-      {"bandwidth", required_argument, 0, 'B'},
-      {0, 0, 0, 0}
-   };
-   const char *short_options = "f:hp:r:t:i:b:vVdD:N6B:";
-   int arg;
-   int options_index=0;
-/*
- * Return immediately if the local process_options function replaces this
- * generic one.
- */
-   if (local_process_options(argc, argv))
-      return;
-
-   while ((arg=getopt_long_only(argc, argv, short_options, long_options, &options_index)) != -1) {
-      switch (arg) {
-         char interval_str[MAXLINE];    /* --interval argument */
-         size_t interval_len;   /* --interval argument length */
-         char bandwidth_str[MAXLINE];   /* --bandwidth argument */
-         size_t bandwidth_len;  /* --bandwidth argument length */
-
-         case 'f':	/* --file */
-            strncpy(filename, optarg, MAXLINE);
-            filename_flag=1;
-            break;
-         case 'h':	/* --help */
-            usage(EXIT_SUCCESS);
-            break;
-         case 'p':	/* --protocol */
-            ip_protocol=Strtoul(optarg, 10);
-            break;
-         case 'r':	/* --retry */
-            retry=Strtoul(optarg, 10);
-            break;
-         case 't':	/* --timeout */
-            timeout=Strtoul(optarg, 10);
-            break;
-         case 'i':	/* --interval */
-            strncpy(interval_str, optarg, MAXLINE);
-            interval_len=strlen(interval_str);
-            if (interval_str[interval_len-1] == 'u') {
-               interval=Strtoul(interval_str, 10);
-            } else if (interval_str[interval_len-1] == 's') {
-               interval=1000000 * Strtoul(interval_str, 10);
-            } else {
-               interval=1000 * Strtoul(interval_str, 10);
-            }
-            break;
-         case 'b':	/* --backoff */
-            backoff_factor=atof(optarg);
-            break;
-         case 'v':	/* --verbose */
-            verbose++;
-            break;
-         case 'V':	/* --version */
-            rawip_scan_version();
-            exit(0);
-            break;
-         case 'd':	/* --debug */
-            debug++;
-            break;
-         case 'D':	/* --data */
-            local_data = Malloc(strlen(optarg)+1);
-            strcpy(local_data, optarg);
-            break;
-         case 'R':      /* --random */
-            random_flag=1;
-            break;
-         case 'N':	/* --numeric */
-            numeric_flag=1;
-            break;
-         case '6':      /* --ipv6 */
-            ipv6_flag=1;
-            break;
-         case 'B':      /* --bandwidth */
-            strncpy(bandwidth_str, optarg, MAXLINE);
-            bandwidth_len=strlen(bandwidth_str);
-            if (bandwidth_str[bandwidth_len-1] == 'M') {
-               bandwidth=1000000 * Strtoul(bandwidth_str, 10);
-            } else if (bandwidth_str[bandwidth_len-1] == 'K') {
-               bandwidth=1000 * Strtoul(bandwidth_str, 10);
-            } else {
-               bandwidth=Strtoul(bandwidth_str, 10);
-            }
-            break;
-         default:	/* Unknown option */
-            usage(EXIT_FAILURE);
-            break;
-      }
-   }
-}
-
-/*
- *	local_process_options	--	Process options and arguments.
- *
- *	Inputs:
- *
- *	argc	Command line arg count
- *	argv	Command line args
- *
- *	Returns:
- *
- *      0 (Zero) if this function doesn't need to do anything, or
- *      1 (One) if this function replaces the generic process_options function.
- *
- *      This protocol-specific process_options routine can replace the generic
- *      rawip-scan process_options routine if required.  If it is to replace the
- *      generic routine, then it must perform all of the process_options
- *	functions and return 1.  Otherwise, it must do nothing and return 0.
- */
-int
-local_process_options(int argc, char *argv[]) {
    struct option long_options[] = {
       {"file", required_argument, 0, 'f'},
       {"help", no_argument, 0, 'h'},
@@ -2026,7 +1889,6 @@ local_process_options(int argc, char *argv[]) {
             break;
       }
    }
-   return 1;	/* Replace generic process_options() function */
 }
 
 /*
