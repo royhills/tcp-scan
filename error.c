@@ -1,6 +1,20 @@
 /*
- * The RAWUP Scan Engine (rawip-scan-engine) is Copyright (C) 2003 Roy Hills,
+ * The TCP Scanner (tcp-scan) is Copyright (C) 2003-2007 Roy Hills,
  * NTA Monitor Ltd.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
  * $Id$
  *
@@ -13,6 +27,8 @@
 
 #include "rawip-scan-engine.h"
 
+static char rcsid[] = "$Id$"; /* RCS ID for ident(1) */
+
 int daemon_proc;	/* Non-zero if process is a daemon */
 
 /*
@@ -23,7 +39,7 @@ err_sys(const char *fmt,...) {
    va_list ap;
 
    va_start(ap, fmt);
-   err_print(1, 0, fmt, ap);
+   err_print(1, fmt, ap);
    va_end(ap);
    exit(1);
 }
@@ -36,7 +52,7 @@ warn_sys(const char *fmt,...) {
    va_list ap;
 
    va_start(ap, fmt);
-   err_print(1, 0, fmt, ap);
+   err_print(1, fmt, ap);
    va_end(ap);
 }
 
@@ -48,7 +64,7 @@ err_msg(const char *fmt,...) {
    va_list ap;
 
    va_start(ap, fmt);
-   err_print(0, 0, fmt, ap);
+   err_print(0, fmt, ap);
    va_end(ap);
    exit(1);
 }
@@ -61,19 +77,7 @@ warn_msg(const char *fmt,...) {
    va_list ap;
 
    va_start(ap, fmt);
-   err_print(0, 0, fmt, ap);
-   va_end(ap);
-}
-
-/*
- *	Function to handle informational syslog messages
- */
-void
-info_syslog(const char *fmt,...) {
-   va_list ap;
-
-   va_start(ap, fmt);
-   err_print(0, LOG_INFO, fmt, ap);
+   err_print(0, fmt, ap);
    va_end(ap);
 }
 
@@ -82,7 +86,7 @@ info_syslog(const char *fmt,...) {
  *	functions.
  */
 void
-err_print (int errnoflag, int level, const char *fmt, va_list ap) {
+err_print (int errnoflag, const char *fmt, va_list ap) {
    int errno_save;
    int n;
    char buf[MAXLINE];
@@ -95,11 +99,12 @@ err_print (int errnoflag, int level, const char *fmt, va_list ap) {
      snprintf(buf+n, MAXLINE-n, ": %s", strerror(errno_save));
    strcat(buf, "\n");
 
-   if (level != 0) {
-      syslog(level, "%s", buf);
-   } else {
-      fflush(stdout);	/* In case stdout and stderr are the same */
-      fputs(buf, stderr);
-      fflush(stderr);
-   }
+   fflush(stdout);	/* In case stdout and stderr are the same */
+   fputs(buf, stderr);
+   fflush(stderr);
+}
+
+void
+error_use_rcsid(void) {
+   fprintf(stderr, "%s\n", rcsid);      /* Use rcsid to stop compiler optimising away */
 }

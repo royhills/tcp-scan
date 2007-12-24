@@ -1,6 +1,20 @@
 /*
- * The RAWIP Scan Engine (rawip-scan-engine) is Copyright (C) 2003-2006 Roy Hills,
+ * The TCP Scanner (tcp-scan) is Copyright (C) 2003-2007 Roy Hills,
  * NTA Monitor Ltd.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
  * $Id$
  *
@@ -16,7 +30,7 @@
  *
  * rawip-scan-engine sends probe packets to the specified hosts and displays
  * any responses received.  It is a protocol-neutral engine which needs some
- * protocol specific functions (in a seperate source file) to build a working
+ * protocol specific functions (in a separate source file) to build a working
  * scanner.
  * 
  */
@@ -46,8 +60,6 @@ int ipv6_flag=0;			/* IPv6 */
 unsigned interval=0;			/* Desired interval between packets */
 unsigned bandwidth=DEFAULT_BANDWIDTH;	/* Bandwidth in bits per sec */
 
-extern char const scanner_name[];	/* Scanner Name */
-extern char const scanner_version[];	/* Scanner Version */
 extern unsigned retry;			/* Number of retries */
 extern unsigned timeout;		/* Per-host timeout */
 extern float backoff_factor;		/* Backoff factor */
@@ -57,19 +69,14 @@ static char *ga_err_msg;		/* getaddrinfo error message */
 
 int
 main(int argc, char *argv[]) {
-   char arg_str[MAXLINE];	/* Args as string for syslog */
    int sockfd;			/* IP socket file descriptor */
    struct sockaddr_in sa_peer;
    struct timeval now;
    unsigned char packet_in[MAXIP];	/* Received packet */
-   char namebuf[MAXLINE];
-   ip_address *hp;
    struct timeval diff;		/* Difference between two timevals */
    unsigned select_timeout;	/* Select timeout */
    unsigned long long loop_timediff;	/* Time since last packet sent in us */
    unsigned long long host_timediff; /* Time since last pkt sent to this host (us) */
-   int arg;
-   int arg_str_space;		/* Used to avoid buffer overruns when copying */
    struct timeval last_packet_time;	/* Time last packet was sent */
    int req_interval;		/* Requested per-packet interval */
    int cum_err=0;		/* Cumulative timing error */
@@ -82,28 +89,6 @@ main(int argc, char *argv[]) {
    int first_timeout=1;
    const int on = 1;		/* For setsockopt */
    int i;
-/*
- *	Open syslog channel and log arguments if required.
- *	We must be careful here to avoid overflowing the arg_str buffer
- *	which could result in a buffer overflow vulnerability.  That's why
- *	we use strncat and keep track of the remaining buffer space.
- */
-#ifdef SYSLOG
-   openlog(scanner_name, LOG_PID, SYSLOG_FACILITY);
-   arg_str[0] = '\0';
-   arg_str_space = MAXLINE;	/* Amount of space in the arg_str buffer */
-   for (arg=0; arg<argc; arg++) {
-      arg_str_space -= strlen(argv[arg]);
-      if (arg_str_space > 0) {
-         strncat(arg_str, argv[arg], arg_str_space);
-         if (arg < (argc-1)) {
-            strcat(arg_str, " ");
-            arg_str_space--;
-         }
-      }
-   }
-   info_syslog("Starting: %s", arg_str);
-#endif
 /*
  *	Process options.
  */
@@ -137,8 +122,6 @@ main(int argc, char *argv[]) {
  *	If we're not reading from a file, then we must have some hosts
  *	given as command line arguments.
  */
-   sprintf(namebuf, "%s-target.test.nta-monitor.com", scanner_name);
-   hp = get_host_address(namebuf, AF_INET, NULL, &ga_err_msg);
    if (!filename_flag) 
       if ((argc - optind) < 1)
          usage(EXIT_FAILURE);
@@ -244,7 +227,7 @@ main(int argc, char *argv[]) {
 #ifndef LIST_ENTRY_NAME
 #error LIST_ENTRY_NAME must be defined
 #endif
-   printf("Starting %s %s (%s) with %u %s\n", scanner_name, scanner_version,
+   printf("Starting %s with %u %s\n",
           PACKAGE_STRING, num_hosts, LIST_ENTRY_NAME);
 /*
  *	Display the lists if verbose setting is 3 or more.
@@ -365,13 +348,8 @@ main(int argc, char *argv[]) {
    elapsed_seconds = (elapsed_time.tv_sec*1000 +
                       elapsed_time.tv_usec/1000) / 1000.0;
 
-#ifdef SYSLOG
-   info_syslog("Ending: %u hosts scanned in %.3f seconds (%.2f hosts/sec). %u responded",
-               num_hosts, elapsed_seconds, num_hosts/elapsed_seconds,
-               responders);
-#endif
    printf("Ending %s: %u hosts scanned in %.3f seconds (%.2f hosts/sec).  %u responded\n",
-          scanner_name, num_hosts, elapsed_seconds, num_hosts/elapsed_seconds,
+          PACKAGE_STRING, num_hosts, elapsed_seconds, num_hosts/elapsed_seconds,
           responders);
    if (debug) {print_times(); printf("main: End\n");}
    return 0;
@@ -656,7 +634,7 @@ dump_list(void) {
  */
 void
 usage(int status) {
-   fprintf(stderr, "Usage: %s [options] [hosts...]\n", scanner_name);
+   fprintf(stderr, "Usage: tcp-scan [options] [hosts...]\n");
    fprintf(stderr, "\n");
    fprintf(stderr, "Hosts are specified on the command line unless the --file option is specified.\n");
    fprintf(stderr, "Each host uses %u bytes of memory.\n",
@@ -1044,18 +1022,25 @@ process_options(int argc, char *argv[]) {
  *	None.
  *
  *	This displays the rawip-scan version information and also calls the
- *	protocol-specific version function to display the protocol-specfic
- *	version informattion.
+ *	protocol-specific version function to display the protocol-specific
+ *	version information.
  */
 void
 rawip_scan_version (void) {
-   fprintf(stderr, "%s %s (%s)\n\n", scanner_name, scanner_version, PACKAGE_STRING);
-   fprintf(stderr, "Copyright (C) 2003-2006 Roy Hills, NTA Monitor Ltd.\n");
+   fprintf(stderr, "%s\n\n", PACKAGE_STRING);
+   fprintf(stderr, "Copyright (C) 2003-2007 Roy Hills, NTA Monitor Ltd.\n");
+   fprintf(stderr, "tcp-scan comes with NO WARRANTY to the extent permitted by law.\n");
+   fprintf(stderr, "You may redistribute copies of arp-scan under the terms of the GNU\n");
+   fprintf(stderr, "General Public License.\n");
+   fprintf(stderr, "For more information about these matters, see the file named COPYING.\n");
    fprintf(stderr, "\n");
+   fprintf(stderr, "%s\n", pcap_lib_version());
 /* We use rcsid here to prevent it being optimised away */
    fprintf(stderr, "%s\n", rcsid);
 /* Call scanner-specific version routine */
    local_version();
+   error_use_rcsid();
+   wrappers_use_rcsid();
 }
 
 /*
@@ -1070,7 +1055,7 @@ rawip_scan_version (void) {
  *
  *	Returns:
  *
- *	Pointer to the IP address, or NULL if an error ocurred.
+ *	Pointer to the IP address, or NULL if an error occurred.
  *
  *	This function is basically a wrapper for getaddrinfo().
  */

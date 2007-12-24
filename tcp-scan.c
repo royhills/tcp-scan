@@ -1,6 +1,20 @@
 /*
- * The TCP Scanner (tcp-scan) is Copyright (C) 2003-2006 Roy Hills,
+ * The TCP Scanner (tcp-scan) is Copyright (C) 2003-2007 Roy Hills,
  * NTA Monitor Ltd.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
  * $Id$
  *
@@ -52,8 +66,6 @@ int portname_flag=0;			/* Display port names */
 int tcp_flags_flag=0;			/* Specify outbound TCP flags */
 struct tcp_flags_struct tcp_flags;	/* Specified TCP flags */
 char **portnames=NULL;
-char const scanner_name[] = "tcp-scan";
-char const scanner_version[] = "1.12";
 
 extern int verbose;	/* Verbose level */
 extern int debug;	/* Debug flag */
@@ -68,7 +80,7 @@ extern unsigned responders;		/* Number of hosts which responded */
 extern char filename[MAXLINE];
 extern int filename_flag;
 extern int random_flag;			/* Randomise the list */
-extern int numeric_flag;		/* IP addreses only */
+extern int numeric_flag;		/* IP addresses only */
 extern int ipv6_flag;			/* IPv6 */
 extern unsigned bandwidth;
 extern unsigned interval;
@@ -431,7 +443,7 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
  *
  *	s		IP socket file descriptor
  *	he		Host entry to send to. If NULL, then no packet is sent
- *	ip_protocol	IP Protcol to use
+ *	ip_protocol	IP Protocol to use
  *	last_packet_time	Time when last packet was sent
  *
  *      Returns:
@@ -839,7 +851,7 @@ local_version(void) {
  */
 void
 local_help(void) {
-   fprintf(stderr, "\n--data=<p> or -D <p>\tSpecify TCP detination port(s).\n");
+   fprintf(stderr, "\n--data=<p> or -D <p>\tSpecify TCP destination port(s).\n");
    fprintf(stderr, "\t\t\tThis option can be a single port, a list of ports\n");
    fprintf(stderr, "\t\t\tseparated by commas, or an inclusive range with the\n");
    fprintf(stderr, "\t\t\tbounds separated by \"-\".\n");
@@ -1225,7 +1237,7 @@ local_find_host(struct host_entry **ptr, struct host_entry **he,
  * Inputs:
  *
  *	args		Special args (not used)
- *	header		pcap header structire
+ *	header		pcap header structure
  *	packet_in	The captured packet
  *
  * Returns:

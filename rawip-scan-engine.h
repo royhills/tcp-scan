@@ -1,6 +1,20 @@
 /*
- * The RAWIP Scan Engine (rawip-scan-engine) is Copyright (C) 2003 Roy Hills,
+ * The TCP Scanner (tcp-scan) is Copyright (C) 2003-2007 Roy Hills,
  * NTA Monitor Ltd.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
  * $Id$
  *
@@ -41,10 +55,6 @@
 
 #ifdef HAVE_NETDB_H
 #include <netdb.h>
-#endif
-
-#ifdef HAVE_SYSLOG_H
-#include <syslog.h>
 #endif
 
 #ifdef HAVE_GETOPT_H
@@ -89,8 +99,6 @@
 
 #define MAXLINE 255			/* Max line length for input files */
 #define MAXIP 65515			/* Max IP data size = 64k - 20 */
-#define SYSLOG 1			/* Use syslog if defined */
-#define SYSLOG_FACILITY LOG_USER	/* Syslog facility to use */
 #define REALLOC_COUNT 1000		/* Entries to realloc at once */
 #define DEFAULT_BANDWIDTH 56000		/* Default bandwidth in bits/sec */
 #define MINIMUM_FRAME_SIZE 46		/* Minimum data size for layer 2 */
@@ -120,7 +128,7 @@ void warn_sys(const char *, ...);
 void err_msg(const char *, ...);
 void warn_msg(const char *, ...);
 void info_syslog(const char *, ...);
-void err_print(int, int, const char *, va_list);
+void err_print(int, const char *, va_list);
 void usage(int);
 void add_host(char *, unsigned);
 int send_packet(int, struct host_entry *, int, struct timeval *);
@@ -157,3 +165,4 @@ void *Realloc(void *, size_t);
 unsigned long int Strtoul(const char *, int);
 /* The following functions are just to prevent rcsid being optimised away */
 void wrappers_use_rcsid(void);
+void error_use_rcsid(void);

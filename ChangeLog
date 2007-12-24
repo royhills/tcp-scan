@@ -5,4 +5,20 @@ $Id$
 	* Converted tcp-scan to GPL license.  Previous versions were
 	  NTA Monitor internal use only.
 
-	  Added files AUTHORS, ChangeLog, NEWS and README.
+	  Added GPL text to beginning of all source files and to
+	  --version output.
+
+	  Added files AUTHORS, ChangeLog, NEWS, README and TODO.
+
+	  Removed unneeded files random.c, generic-ip-scan.c and
+	  generic-ip-scan.h.
+
+	  Removed variables "scanner_name" and "scanner_version" and replaced
+	  with PACKAGE_STRING.
+
+	  Removed DNS lookup for tcp-scan-target.
+
+	  Removed syslog code.  We don't use this any more, and I doubt that
+	  anyone else needs it.
+
+	  configure.ac: Incremented version to 1.13
