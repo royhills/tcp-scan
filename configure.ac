@@ -28,7 +28,7 @@ AC_SEARCH_LIBS([pcap_open_live], [pcap])
 
 dnl Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS([arpa/inet.h netdb.h netinet/in.h sys/socket.h sys/time.h unistd.h getopt.h pcap.h])
+AC_CHECK_HEADERS([arpa/inet.h netdb.h netinet/in.h sys/socket.h sys/time.h unistd.h getopt.h pcap.h sys/ioctl.h net/if.h sys/utsname.h])
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -106,6 +106,16 @@ AC_CHECK_FUNC([getopt_long_only], ,
   [ AC_LIBOBJ(getopt)
     AC_LIBOBJ(getopt1)
     AC_LIBSOURCE(getopt.h) ])
+
+dnl Check for strlcat and strlcpy.  If we don't have them, use the replacement
+dnl functions from OpenBSD.  Most modern C libraries have these functions,
+dnl but some such as as glibc don't.
+AC_CHECK_FUNC([strlcat],
+              [AC_DEFINE(HAVE_STRLCAT, 1, [Define to 1 if the C library includes the strlcat function])],
+              [AC_LIBOBJ(strlcat)])
+AC_CHECK_FUNC([strlcpy],
+              [AC_DEFINE(HAVE_STRLCPY, 1, [Define to 1 if the C library includes the strlcpy function])],
+              [AC_LIBOBJ(strlcpy)])
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

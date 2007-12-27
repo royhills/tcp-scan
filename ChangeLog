@@ -7,6 +7,41 @@ $Id$
 
 	* New source file: utils.c, containing utility functions.
 
+	* Added mt19937ar.c: mersenne twister PRNG.
+	  Changed random number implementation to use the mersenne twister
+	  functions from mt19937ar.c rather than random() from the C
+          library.  This improves portability, as random() is not part of
+          standard C.
+
+	* Removed unneeded --protocol (-p) option.
+
+        * configure.ac: Added checks for strlcat and strlcpy, with
+          replacement functions using the OpenBSD implementations if they are
+          not present.
+
+        * strlcat.c, strlcpy.c: New source files from the OpenBSD source at
+          http://www.openbsd.org/cgi-bin/cvsweb/src/lib/libc/string
+
+	* *.c: replaced calls to strcat and strncat with strlcat, and
+          calls to strcpy and strncpy with strlcpy.
+
+	* configure.ac, tcp-scan.h: Added checks for headers sys/ioctl.h,
+	  net/if.h and sys/utsname.h, and made these conditional includes.
+
+	* tcp-scan.h, tcp-scan.c: Change structure definitions to
+          typedefs.  i.e. change "struct foo {defs};" to
+          typedef struct {defs} foo;".
+
+	* tcp-scan.c: Removed unneeded Gettimeofday() call in
+	  add_host_port().
+
+	* tcp-scan.c: Change calls to strtol() to use the new
+          wrapper function Strtol() instead, because this checks for
+          errors.  Previously, a non-numeric value would be converted to
+          zero without any error, meaning something like "--snap=xxx"
+          would be silently accepted.  Now such invalid inputs results in
+          an error.
+
 2007-12-21 Roy Hills <Roy.Hills@nta-monitor.com>
 
 	* Converted tcp-scan to GPL license.  Previous versions were

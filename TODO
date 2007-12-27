@@ -1,8 +1,8 @@
 $Id$
 
-Add IPv6 support
-
 Use better port number to name mapping file and distribute this with tcp-scan.
+http://www.graffiti.com/services
+/usr/share/nmap/nmap-services
 
 Don't display closed ports by default [need to check engine usage].
 
@@ -13,3 +13,5 @@ Display port names by default [need to check engine usage].
 Review default bandwidth, and possibly increase it.
 
 Add better "make check" tests and measure code coverage.
+
+Add IPv6 support

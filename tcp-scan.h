@@ -95,12 +95,20 @@
 #include <pcap.h>
 #endif
 
-/* Other Includes */
+#ifdef HAVE_SYS_IOCTL_H
+#include <sys/ioctl.h>
+#endif
+
+#ifdef HAVE_NET_IF_H
+#include <net/if.h>
+#endif
+
+#ifdef HAVE_SYS_UTSNAME_H
+#include <sys/utsname.h>
+#endif
+
 #include "ip.h"
 #include "tcp.h"
-#include <sys/ioctl.h>
-#include <net/if.h>
-#include <sys/utsname.h>
 #include "md5.h"
 
 /* Defines */
@@ -134,7 +142,7 @@ typedef union {
    struct in6_addr v6;
 } ip_address;
 
-struct host_entry {
+typedef struct {
    unsigned n;                  /* Ordinal number for this entry */
    unsigned timeout;            /* Timeout for this host in us */
    ip_address addr;             /* Host IP address */
@@ -143,9 +151,9 @@ struct host_entry {
    unsigned short num_recv;     /* Number of packets received */
    uint16_t dport;              /* Destination port */
    unsigned char live;          /* Set when awaiting response */
-};
+} host_entry;
 
-struct tcp_flags_struct {
+typedef struct {
    int cwr;
    int ecn;
    int urg;
@@ -154,9 +162,16 @@ struct tcp_flags_struct {
    int rst;
    int syn;
    int fin;
-};
+} tcp_flags_struct;
 
 /* Functions */
+
+#ifndef HAVE_STRLCAT
+size_t strlcat(char *dst, const char *src, size_t siz);
+#endif
+#ifndef HAVE_STRLCPY
+size_t strlcpy(char *dst, const char *src, size_t siz);
+#endif
 
 void err_sys(const char *, ...);
 void warn_sys(const char *, ...);
@@ -166,21 +181,21 @@ void info_syslog(const char *, ...);
 void err_print(int, const char *, va_list);
 void usage(int);
 void add_host(char *, unsigned);
-int send_packet(int, struct host_entry *, int, struct timeval *);
+int send_packet(int, host_entry *, int, struct timeval *);
 void recvfrom_wto(int, unsigned char *, int, struct sockaddr *, int);
-void remove_host(struct host_entry **);
+void remove_host(host_entry **);
 void timeval_diff(const struct timeval *, const struct timeval *,
                   struct timeval *);
-struct host_entry *find_host(struct host_entry **, struct in_addr *,
-                             const unsigned char *, int);
-void display_packet(int, const unsigned char *, struct host_entry *,
+host_entry *find_host(host_entry **, struct in_addr *,
+                      const unsigned char *, int);
+void display_packet(int, const unsigned char *, host_entry *,
                     struct in_addr *);
 void advance_cursor(void);
 void dump_list(void);
 void print_times(void);
 void initialise(void);
 void clean_up(void);
-void rawip_scan_version(void);
+void tcp_scan_version(void);
 char *make_message(const char *, ...);
 char *printable(const unsigned char*, size_t);
 void callback(u_char *, const struct pcap_pkthdr *, const u_char *);
@@ -192,12 +207,22 @@ int Gettimeofday(struct timeval *);
 void *Malloc(size_t);
 void *Realloc(void *, size_t);
 unsigned long int Strtoul(const char *, int);
+long int Strtol(const char *, int);
 unsigned int hstr_i(const char *);
 uint16_t in_cksum(uint16_t *, int);
 uint32_t get_source_ip(char *);
 void add_host_port(char *, unsigned, unsigned);
 void create_port_list(char *);
 void process_tcp_flags(const char *);
+/* MT19937 prototypes */
+void init_genrand(unsigned long);
+void init_by_array(unsigned long[], int);
+unsigned long genrand_int32(void);
+long genrand_int31(void);
+double genrand_real1(void);
+double genrand_real2(void);
+double genrand_real3(void);
+double genrand_res53(void);
 /* The following functions are just to prevent rcsid being optimised away */
 void wrappers_use_rcsid(void);
 void error_use_rcsid(void);

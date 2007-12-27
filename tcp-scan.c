@@ -63,19 +63,19 @@ int df_flag=DEFAULT_DF;			/* IP DF Flag */
 int ip_tos=DEFAULT_TOS;			/* IP TOS Field */
 int portname_flag=0;			/* Display port names */
 int tcp_flags_flag=0;			/* Specify outbound TCP flags */
-struct tcp_flags_struct tcp_flags;	/* Specified TCP flags */
+tcp_flags_struct tcp_flags;		/* Specified TCP flags */
 char **portnames=NULL;
 unsigned live_count;			/* Number of entries awaiting reply */
 
 int verbose = 0;			/* Verbose level */
 int debug = 0;				/* Debug flag */
 char *local_data=NULL;			/* Local data from --data option */
-struct host_entry *helist = NULL;	/* Array of host entries */
-struct host_entry **helistptr;		/* Array of pointers to host entries */
+host_entry *helist = NULL;		/* Array of host entries */
+host_entry **helistptr;			/* Array of pointers to host entries */
 unsigned num_hosts = 0;			/* Number of entries in the list */
 unsigned max_iter;			/* Max iterations in find_host() */
 pcap_t *handle;				/* pcap handle */
-struct host_entry **cursor;		/* Pointer to current host entry ptr */
+host_entry **cursor;			/* Pointer to current host entry ptr */
 unsigned responders = 0;		/* Number of hosts which responded */
 char filename[MAXLINE];
 int filename_flag=0;
@@ -132,8 +132,7 @@ main(int argc, char *argv[]) {
    if ((setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &on, sizeof(on))) != 0)
       err_sys("setsockopt");
 /*
- *      Call protocol-specific initialisation routine to perform any
- *      initial setup required.
+ *      Call initialisation routine to perform initial setup.
  */
    initialise();
 /*
@@ -197,24 +196,24 @@ main(int argc, char *argv[]) {
 /*
  *      Create and initialise array of pointers to host entries.
  */
-   helistptr = Malloc(num_hosts * sizeof(struct host_entry *));
+   helistptr = Malloc(num_hosts * sizeof(host_entry *));
    for (i=0; i<num_hosts; i++)
       helistptr[i] = &helist[i];
 /*
  *      Randomise the list if required.
  */
    if (random_flag) {
-      unsigned seed;
+      unsigned random_seed;
       struct timeval tv;
       int r;
-      struct host_entry *temp;
+      host_entry *temp;
 
       Gettimeofday(&tv);
-      seed = tv.tv_usec ^ getpid();
-      srandom(seed);
+      random_seed = tv.tv_usec ^ getpid();	/* Unpredictable value */
+      init_genrand(random_seed);
 
       for (i=num_hosts-1; i>0; i--) {
-         r = random() % (i+1);     /* Random number 0<=r<i */
+         r = (int)(genrand_real2() * i);	/* 0<=r<i */
          temp = helistptr[i];
          helistptr[i] = helistptr[r];
          helistptr[r] = temp;
@@ -396,16 +395,16 @@ main(int argc, char *argv[]) {
  *      was received in the format: <IP-Address><TAB><Details>.
  */
 void
-display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
+display_packet(int n, const unsigned char *packet_in, host_entry *he,
                struct in_addr *recv_addr) {
-   struct iphdr *iph;
-   struct tcphdr *tcph;
+   const struct iphdr *iph;
+   const struct tcphdr *tcph;
    char *msg;
    char *cp;
    char *flags;
    int data_len;
    unsigned data_offset;
-   char *df;
+   const char *df;
    int optlen;
 /*
  *	Set msg to the IP address of the host entry, plus the address of the
@@ -433,8 +432,8 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
  *      Note that iph.ihl is in 32-bit units.  We multiply by 4 to get bytes.
  *      iph.lhl is normally 5, but can be larger if IP options are present.
  */
-   iph = (struct iphdr *) (packet_in + ip_offset);
-   tcph = (struct tcphdr *) (packet_in + ip_offset + 4*(iph->ihl));
+   iph = (const struct iphdr *) (packet_in + ip_offset);
+   tcph = (const struct tcphdr *) (packet_in + ip_offset + 4*(iph->ihl));
 /*
  *	Add TCP port to message.
  */
@@ -557,12 +556,13 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
       if (optlen) {
          char *options=NULL;
          int trunc=0;
-         unsigned char *optptr=(unsigned char *) (packet_in + ip_offset +
+         const unsigned char *optptr=(const unsigned char *)
+                                                  (packet_in + ip_offset +
                                                   4*(iph->ihl) +
                                                   sizeof(struct tcphdr));
-         uint16_t *sptr;	/* 16-bit ptr - used for MSS */
-         uint32_t *lptr1;	/* 32-bit ptr - used for timestamp value */
-         uint32_t *lptr2;	/* 32-bit ptr - used for timestamp value */
+         const uint16_t *sptr;	/* 16-bit ptr - used for MSS */
+         const uint32_t *lptr1;	/* 32-bit ptr - used for timestamp value */
+         const uint32_t *lptr2;	/* 32-bit ptr - used for timestamp value */
          unsigned char uc;
 /*
  *	Check if options have been truncated.
@@ -609,7 +609,7 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
                   break;
                case TCPOPT_MAXSEG:
                   optlen -= 4;
-                  sptr = (uint16_t *) (optptr+2);
+                  sptr = (const uint16_t *) (optptr+2);
                   optptr += 4;
                   if (options) {
                      cp = options;
@@ -644,8 +644,8 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
                   break;
                case TCPOPT_TIMESTAMP:
                   optlen -= 10;
-                  lptr1 = (uint32_t *) (optptr+2);	/* TS Value */
-                  lptr2 = (uint32_t *) (optptr+6);	/* TS Echo Reply */
+                  lptr1 = (const uint32_t *) (optptr+2); /* TS Value */
+                  lptr2 = (const uint32_t *) (optptr+6); /* TS Echo Reply */
                   optptr += 10;
                   if (options) {
                      cp = options;
@@ -739,7 +739,7 @@ display_packet(int n, const unsigned char *packet_in, struct host_entry *he,
  *      It must also update the "last_send_time" field for this host entry.
  */
 int
-send_packet(int s, struct host_entry *he, int ip_protocol,
+send_packet(int s, host_entry *he, int ip_protocol,
             struct timeval *last_packet_time) {
    struct sockaddr_in sa_peer;
    char buf[MAXIP];
@@ -926,7 +926,7 @@ send_packet(int s, struct host_entry *he, int ip_protocol,
 }
 
 /*
- *      initialise -- Protocol-specific initialisation routine.
+ *      initialise -- initialisation routine.
  *
  *      Inputs:
  *
@@ -1074,7 +1074,7 @@ initialise(void) {
 }
 
 /*
- *      clean_up -- Protocol-specific Clean-Up routine.
+ *      clean_up -- Clean-Up routine.
  *
  *      Inputs:
  *
@@ -1113,7 +1113,7 @@ usage(int status) {
    fprintf(stderr, "\n");
    fprintf(stderr, "Hosts are specified on the command line unless the --file option is specified.\n");
    fprintf(stderr, "Each host uses %u bytes of memory.\n",
-           sizeof(struct host_entry) + sizeof(struct host_entry *));
+           sizeof(host_entry) + sizeof(host_entry *));
    fprintf(stderr, "\n");
    fprintf(stderr, "Options:\n");
    fprintf(stderr, "\n");
@@ -1121,7 +1121,6 @@ usage(int status) {
    fprintf(stderr, "\n--file=<fn> or -f <fn>\tRead hostnames or addresses from the specified file\n");
    fprintf(stderr, "\t\t\tinstead of from the command line. One name or IP\n");
    fprintf(stderr, "\t\t\taddress per line.  Use \"-\" for standard input.\n");
-   fprintf(stderr, "\n--protocol=<p> or -p <p>\tSet IP protocol to <p>\n");
    fprintf(stderr, "\n--retry=<n> or -r <n>\tSet total number of attempts per host to <n>,\n");
    fprintf(stderr, "\t\t\tdefault=%d.\n", retry);
    fprintf(stderr, "\n--timeout=<n> or -t <n>\tSet initial per host timeout to <n> ms, default=%d.\n", timeout);
@@ -1325,7 +1324,7 @@ add_host(char *name, unsigned timeout) {
  *	function updates cursor so that it points to the next entry.
  */
 void
-remove_host(struct host_entry **he) {
+remove_host(host_entry **he) {
    if ((*he)->live) {
       (*he)->live = 0;
       live_count--;
@@ -1417,8 +1416,7 @@ void
 add_host_port(char *name, unsigned timeout, unsigned port) {
    ip_address *hp=NULL;
    ip_address addr;
-   struct host_entry *he;
-   struct timeval now;
+   host_entry *he;
    static int num_left=0;	/* Number of free entries left */
    int result;
 
@@ -1445,18 +1443,16 @@ add_host_port(char *name, unsigned timeout, unsigned port) {
 
    if (!num_left) {	/* No entries left, allocate some more */
       if (helist)
-         helist=Realloc(helist, (num_hosts * sizeof(struct host_entry)) +
-                        REALLOC_COUNT*sizeof(struct host_entry));
+         helist=Realloc(helist, (num_hosts * sizeof(host_entry)) +
+                        REALLOC_COUNT*sizeof(host_entry));
       else
-         helist=Malloc(REALLOC_COUNT*sizeof(struct host_entry));
+         helist=Malloc(REALLOC_COUNT*sizeof(host_entry));
       num_left = REALLOC_COUNT;
    }
 
    he = helist + num_hosts; /* Would array notation be better? */
    num_hosts++;
    num_left--;
-
-   Gettimeofday(&now);
 
    he->n = num_hosts;
    if (ipv6_flag) {
@@ -1514,7 +1510,7 @@ uint32_t get_source_ip(char *devname) {
    struct ifreq ifconfig;
    struct sockaddr_in sa;
 
-   strcpy(ifconfig.ifr_name, devname);
+   strlcpy(ifconfig.ifr_name, devname, sizeof(ifconfig.ifr_name));
 
 /* Create UDP socket */
    if ((sockfd=socket(PF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -1545,14 +1541,14 @@ uint32_t get_source_ip(char *devname) {
  *	Returns a pointer to the host entry associated with the specified IP
  *	or NULL if no match found.
  */
-struct host_entry *
-find_host(struct host_entry **he, struct in_addr *addr,
+host_entry *
+find_host(host_entry **he, struct in_addr *addr,
           const unsigned char *packet_in, int n) {
-   struct host_entry **p;
+   host_entry **p;
    int found = 0;
    unsigned iterations = 0;	/* Used for debugging */
-   struct iphdr *iph;
-   struct tcphdr *tcph;
+   const struct iphdr *iph;
+   const struct tcphdr *tcph;
 /*
  *      Don't try to match if packet is too short.
  */
@@ -1564,8 +1560,8 @@ find_host(struct host_entry **he, struct in_addr *addr,
  *      Note that iph.ihl is in 32-bit units.  We multiply by 4 to get bytes.
  *      iph.lhl is normally 5, but can be larger if IP options are present.
  */
-   iph = (struct iphdr *) (packet_in + ip_offset);
-   tcph = (struct tcphdr *) (packet_in + ip_offset + 4*(iph->ihl));
+   iph = (const struct iphdr *) (packet_in + ip_offset);
+   tcph = (const struct tcphdr *) (packet_in + ip_offset + 4*(iph->ihl));
 /*
  *      Don't try to match if host ptr is NULL.
  *      This should never happen, but we check just in case.
@@ -1617,11 +1613,11 @@ find_host(struct host_entry **he, struct in_addr *addr,
 void
 callback(u_char *args, const struct pcap_pkthdr *header,
          const u_char *packet_in) {
-   struct iphdr *iph;
-   struct tcphdr *tcph;
+   const struct iphdr *iph;
+   const struct tcphdr *tcph;
    int n = header->caplen;
    struct in_addr source_ip;
-   struct host_entry *temp_cursor;
+   host_entry *temp_cursor;
 /*
  *      Check that the packet is large enough to decode.
  */
@@ -1635,8 +1631,8 @@ callback(u_char *args, const struct pcap_pkthdr *header,
  *      Note that iph.ihl is in 32-bit units.  We multiply by 4 to get bytes.
  *      iph.lhl is normally 5, but can be larger if IP options are present.
  */
-   iph = (struct iphdr *) (packet_in + ip_offset);
-   tcph = (struct tcphdr *) (packet_in + ip_offset + 4*(iph->ihl));
+   iph = (const struct iphdr *) (packet_in + ip_offset);
+   tcph = (const struct tcphdr *) (packet_in + ip_offset + 4*(iph->ihl));
 /*
  *	Determine source IP address.
  */
@@ -1697,7 +1693,6 @@ process_options(int argc, char *argv[]) {
    struct option long_options[] = {
       {"file", required_argument, 0, 'f'},
       {"help", no_argument, 0, 'h'},
-      {"protocol", required_argument, 0, 'p'},
       {"retry", required_argument, 0, 'r'},
       {"timeout", required_argument, 0, 't'},
       {"interval", required_argument, 0, 'i'},
@@ -1732,7 +1727,7 @@ process_options(int argc, char *argv[]) {
       {0, 0, 0, 0}
    };
    const char *short_options =
-      "f:hp:r:t:i:b:vVdD:s:e:w:oS:m:WaTn:l:I:qgF:O:RNPL:6B:c:";
+      "f:hr:t:i:b:vVdD:s:e:w:oS:m:WaTn:l:I:qgF:O:RNPL:6B:c:";
    int arg;
    int options_index=0;
 
@@ -1746,14 +1741,11 @@ process_options(int argc, char *argv[]) {
          size_t bandwidth_len;  /* --bandwidth argument length */
 
          case 'f':	/* --file */
-            strncpy(filename, optarg, MAXLINE);
+            strlcpy(filename, optarg, sizeof(filename));
             filename_flag=1;
             break;
          case 'h':	/* --help */
             usage(EXIT_SUCCESS);
-            break;
-         case 'p':	/* --protocol */
-            ip_protocol=Strtoul(optarg, 10);
             break;
          case 'r':	/* --retry */
             retry=Strtoul(optarg, 10);
@@ -1762,7 +1754,7 @@ process_options(int argc, char *argv[]) {
             timeout=Strtoul(optarg, 10);
             break;
          case 'i':	/* --interval */
-            strncpy(interval_str, optarg, MAXLINE);
+            strlcpy(interval_str, optarg, sizeof(interval_str));
             interval_len=strlen(interval_str);
             if (interval_str[interval_len-1] == 'u') {
                interval=Strtoul(interval_str, 10);
@@ -1779,7 +1771,7 @@ process_options(int argc, char *argv[]) {
             verbose++;
             break;
          case 'V':	/* --version */
-            rawip_scan_version();
+            tcp_scan_version();
             exit(0);
             break;
          case 'd':	/* --debug */
@@ -1826,10 +1818,10 @@ process_options(int argc, char *argv[]) {
             timestamp_flag=1;
             break;
          case 'n':	/* --snap */
-            snaplen=strtol(optarg, (char **)NULL, 0);
+            snaplen=Strtol(optarg, 0);
             break;
          case 'l':	/* --ttl */
-            ip_ttl=strtol(optarg, (char **)NULL, 0);
+            ip_ttl=Strtol(optarg, 0);
             if (ip_ttl < 0 || ip_ttl > 255)
                err_msg("The --ttl option must be in the range 0 to 255.");
             break;
@@ -1843,12 +1835,12 @@ process_options(int argc, char *argv[]) {
             ignore_dups=1;
             break;
          case 'F':	/* --df */
-            df_flag = strtol(optarg, (char **)NULL, 0);
+            df_flag = Strtol(optarg, 0);
             if (df_flag < 0 || df_flag > 1)
                err_msg("The --df option must be 0 (DF off) or 1 (DF on).");
             break;
          case 'O':	/* --tos */
-            ip_tos = strtol(optarg, (char **)NULL, 0);
+            ip_tos = Strtol(optarg, 0);
             if (ip_tos < 0 || ip_tos > 255)
                err_msg("The --tos option must be in the range 0 to 255.");
             break;
@@ -1870,7 +1862,7 @@ process_options(int argc, char *argv[]) {
             ipv6_flag=1;
             break;
          case 'B':      /* --bandwidth */
-            strncpy(bandwidth_str, optarg, MAXLINE);
+            strlcpy(bandwidth_str, optarg, sizeof(bandwidth_str));
             bandwidth_len=strlen(bandwidth_str);
             if (bandwidth_str[bandwidth_len-1] == 'M') {
                bandwidth=1000000 * Strtoul(bandwidth_str, 10);
@@ -1892,18 +1884,16 @@ process_options(int argc, char *argv[]) {
 }
 
 /*
- *	rawip_scan_version -- display version information
+ *	tcp_scan_version -- display version information
  *
  *	Inputs:
  *
  *	None.
  *
- *	This displays the rawip-scan version information and also calls the
- *	protocol-specific version function to display the protocol-specific
- *	version information.
+ *	This displays the tcp-scan version information.
  */
 void
-rawip_scan_version (void) {
+tcp_scan_version (void) {
    fprintf(stderr, "%s\n\n", PACKAGE_STRING);
    fprintf(stderr, "Copyright (C) 2003-2007 Roy Hills, NTA Monitor Ltd.\n");
    fprintf(stderr, "tcp-scan comes with NO WARRANTY to the extent permitted by law.\n");
@@ -1924,7 +1914,7 @@ rawip_scan_version (void) {
  *
  *	Inputs:
  *
- *	filename	The services file name
+ *	serv_file	The services file name
  *
  *	Outputs:
  *
@@ -1936,7 +1926,7 @@ rawip_scan_version (void) {
  *	regarding invalid names and port numbers.
  */
 void
-create_port_list(char *filename) {
+create_port_list(char *serv_file) {
    FILE *fh;
    char lbuf[1024];
    char desc[256];
@@ -1949,10 +1939,10 @@ create_port_list(char *filename) {
       err_msg("Service file has already been specified");
 
    prot[3]='\0';
-   if ((access(filename, R_OK)) != 0)
-      err_sys("fopen %s", filename);
-   if (!(fh = fopen (filename, "r")))
-      err_sys("fopen %s", filename);
+   if ((access(serv_file, R_OK)) != 0)
+      err_sys("fopen %s", serv_file);
+   if (!(fh = fopen (serv_file, "r")))
+      err_sys("fopen %s", serv_file);
 
    while (fgets (lbuf, sizeof (lbuf), fh)) {
       char *p;
@@ -1997,7 +1987,7 @@ create_port_list(char *filename) {
  *
  *	Inputs:
  *
- *	optarg		Pointer to the --flags option argument.
+ *	flagstr		Pointer to the --flags option argument.
  *
  *	Outputs:
  *
@@ -2008,7 +1998,7 @@ create_port_list(char *filename) {
  *	the specified TCP flags should be used.
  */
 void
-process_tcp_flags(const char *optarg) {
+process_tcp_flags(const char *flagstr) {
    const char *cp1;
    char *cp2;
    int count;
@@ -2016,7 +2006,7 @@ process_tcp_flags(const char *optarg) {
 
    tcp_flags_flag=1;
    count=0;
-   cp1 = optarg;
+   cp1 = flagstr;
    cp2 = flag_list;
    while (*cp1 != '\0') {
       if (!isspace((unsigned char)*cp1)) {

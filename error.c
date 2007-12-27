@@ -18,7 +18,7 @@
  *
  * $Id$
  *
- * error.c -- error routines for RAWIP Scan Engine
+ * error.c -- error routines for tcp-scan
  *
  * Author:	Roy Hills
  * Date:	1 December 2001
@@ -88,7 +88,7 @@ warn_msg(const char *fmt,...) {
 void
 err_print (int errnoflag, const char *fmt, va_list ap) {
    int errno_save;
-   int n;
+   size_t n;
    char buf[MAXLINE];
 
    errno_save=errno;
@@ -97,7 +97,7 @@ err_print (int errnoflag, const char *fmt, va_list ap) {
    n=strlen(buf);
    if (errnoflag)
      snprintf(buf+n, MAXLINE-n, ": %s", strerror(errno_save));
-   strcat(buf, "\n");
+   strlcat(buf, "\n", sizeof(buf));
 
    fflush(stdout);	/* In case stdout and stderr are the same */
    fputs(buf, stderr);

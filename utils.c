@@ -107,44 +107,6 @@ hstr_i(const char *cptr)
 }
 
 /*
- *	hex2data -- Convert hex string to binary data
- *
- *	Inputs:
- *
- *	string		The string to convert
- *	data_len	(output) The length of the resultant binary data
- *
- *	Returns:
- *
- *	Pointer to the binary data.
- *
- *	The returned pointer points to malloc'ed storage which should be
- *	free'ed by the caller when it's no longer needed.  If the length of
- *	the inputs string is not even, the function will return NULL and
- *	set data_len to 0.
- */
-unsigned char *
-hex2data(const char *string, size_t *data_len) {
-   unsigned char *data;
-   unsigned char *cp;
-   unsigned i;
-   size_t len;
-
-   if (strlen(string) %2 ) {	/* Length is odd */
-      *data_len = 0;
-      return NULL;
-   }
-
-   len = strlen(string) / 2;
-   data = Malloc(len);
-   cp = data;
-   for (i=0; i<len; i++)
-      *cp++=hstr_i(&string[i*2]);
-   *data_len = len;
-   return data;
-}
-
-/*
  * make_message -- allocate a sufficiently large string and print into it.
  *
  * Inputs:
@@ -181,54 +143,6 @@ make_message(const char *fmt, ...) {
          size *= 2;  /* twice the old size */
       p = Realloc (p, size);
    }
-}
-
-/*
- *	hexstring -- Convert data to printable hex string form
- *
- *	Inputs:
- *
- *	string	Pointer to input data.
- *	size	Size of input data.
- *
- *	Returns:
- *
- *	Pointer to the printable hex string.
- *
- *	Each byte in the input data will be represented by two hex digits
- *	in the output string.  Therefore the output string will be twice
- *	as long as the input data plus one extra byte for the trailing NULL.
- *
- *	The pointer returned points to malloc'ed storage which should be
- *	free'ed by the caller when it's no longer needed.
- */
-char *
-hexstring(const unsigned char *data, size_t size) {
-   char *result;
-   char *r;
-   const unsigned char *cp;
-   unsigned i;
-/*
- *	If the input data is NULL, return an empty string.
- */
-   if (data == NULL) {
-      result = Malloc(1);
-      result[0] = '\0';
-      return result;
-   }
-/*
- *	Create and return hex string.
- */
-   result = Malloc(2*size + 1);
-   cp = data;
-   r = result;
-   for (i=0; i<size; i++) {
-      snprintf(r, 3, "%.2x", *cp++);
-      r += 2;
-   }
-   *r = '\0';
-
-   return result;
 }
 
 /*
