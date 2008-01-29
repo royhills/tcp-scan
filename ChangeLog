@@ -1,5 +1,21 @@
 $Id$
 
+2007-12-31 Roy Hills <Roy.Hills@nta-monitor.com>
+
+	* tcp-scan.c: Use mersenne twister PRNG to generate random values
+	  for seq_no, ack_no and source_port rather than using an md5 hash.
+
+	* md5.c, md5.h: Source files removed as they are no longer needed.
+
+	* tcp-scan.h: Removed include for md5.h.
+
+	* tcp-scan-services: New TCP services file.
+
+	* tcp-scan.c: Use TCP service file in DATADIR rather than using hard-
+	  coded absolute path.
+
+	* tcp-scan.1: New manpage file.
+
 2007-12-24 Roy Hills <Roy.Hills@nta-monitor.com>
 
 	* Removed rawip-scan-engine.c and rawip-scan-engine.h.  Code moved to

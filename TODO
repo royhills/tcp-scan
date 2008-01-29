@@ -14,4 +14,12 @@ Review default bandwidth, and possibly increase it.
 
 Add better "make check" tests and measure code coverage.
 
+Allow the use of networks and ranges for the target hosts.
+
 Add IPv6 support
+
+Complete manpage tcp-scan.1
+
+Add option to use different services file.
+
+Remove references to RMIF environment variable.

@@ -1,0 +1,40 @@
+.\" Copyright (C) Roy Hills, NTA Monitor Ltd.
+.\"
+.\" Copying and distribution of this file, with or without modification,
+.\" are permitted in any medium without royalty provided the copyright
+.\" notice and this notice are preserved.
+.\"
+.\" $Id$
+.TH TCP-SCAN 1 "December 27, 2007"
+.\" Please adjust this date whenever revising the man page.
+.SH NAME
+tcp-scan \- Bandwidth-optimised half-open TCP portscanner
+.SH SYNOPSIS
+.B tcp-scan
+.RI [ options ] " " [ hosts ...]
+.PP
+Target hosts must be specified on the command line unless the
+.B --file
+option is given, in which case the targets are read from the specified file
+instead.
+.PP
+You will need to be root, or
+.B tcp-scan
+must be SUID root, in order to run
+.BR tcp-scan ,
+because the functions that it uses to read and write packets require root
+privilege.
+.PP
+The target hosts can be specified as IP addresses or hostnames.
+.SH DESCRIPTION
+.SH OPTIONS
+.SH FILES
+.SH EXAMPLES
+.SH AUTHOR
+Roy Hills <Roy.Hills@nta-monitor.com>
+.SH "SEE ALSO"
+.I http://www.nta-monitor.com/wiki/
+The tcp-scan wiki page.
+.PP
+.I http://www.nta-monitor.com/tools/tcp-scan/
+The tcp-scan homepage.

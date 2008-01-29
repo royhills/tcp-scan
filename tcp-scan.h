@@ -109,7 +109,6 @@
 
 #include "ip.h"
 #include "tcp.h"
-#include "md5.h"
 
 /* Defines */
 
@@ -120,7 +119,7 @@
 #define MINIMUM_FRAME_SIZE 46           /* Minimum data size for layer 2 */
 #define PACKET_OVERHEAD 18              /* Size of Ethernet header */
 /* IP protocol 6 = TCP */
-#define DEFAULT_IP_PROTOCOL 6		/* Default IP Protocol */
+#define IP_PROTOCOL 6			/* Default IP Protocol */
 #define DEFAULT_BACKOFF_FACTOR 1.5      /* Default timeout backoff factor */
 #define DEFAULT_RETRY 3                 /* Default number of retries */
 #define DEFAULT_TIMEOUT 500             /* Default per-host timeout in ms */
@@ -133,7 +132,7 @@
 #define DEFAULT_TTL 64			/* IP TTL */
 #define DEFAULT_DF 1			/* IP DF Flag */
 #define DEFAULT_TOS 0			/* IP TOS Field */
-#define SERVICE_FILE "/usr/lib/strobe.services"
+#define SERVICE_FILE "tcp-scan-services"
 
 /* Structures */
 

@@ -38,7 +38,6 @@
 static char const rcsid[] = "$Id$";   /* RCS ID for ident(1) */
 
 /* Global variables */
-int ip_protocol = DEFAULT_IP_PROTOCOL;	/* IP Protocol */
 unsigned retry = DEFAULT_RETRY;		/* Number of retries */
 unsigned timeout = DEFAULT_TIMEOUT;	/* Per-host timeout */
 float backoff_factor = DEFAULT_BACKOFF_FACTOR;	/* Backoff factor */
@@ -203,14 +202,8 @@ main(int argc, char *argv[]) {
  *      Randomise the list if required.
  */
    if (random_flag) {
-      unsigned random_seed;
-      struct timeval tv;
       int r;
       host_entry *temp;
-
-      Gettimeofday(&tv);
-      random_seed = tv.tv_usec ^ getpid();	/* Unpredictable value */
-      init_genrand(random_seed);
 
       for (i=num_hosts-1; i>0; i--) {
          r = (int)(genrand_real2() * i);	/* 0<=r<i */
@@ -336,7 +329,7 @@ main(int argc, char *argv[]) {
             } else {    /* Retry limit not reached for this host */
                if ((*cursor)->num_sent)
                   (*cursor)->timeout *= backoff_factor;
-               send_packet(sockfd, *cursor, ip_protocol, &last_packet_time);
+               send_packet(sockfd, *cursor, IP_PROTOCOL, &last_packet_time);
                advance_cursor();
             }
          } else {       /* We can't send a packet to this host yet */
@@ -942,48 +935,33 @@ send_packet(int s, host_entry *he, int ip_protocol,
  */
 void
 initialise(void) {
-   md5_state_t context;
-   struct timeval now;
-   pid_t pid;
-   struct utsname uname_buf;
-   char str[MAXLINE];
-   md5_byte_t md5_digest[16];		/* MD5 hash used as random source */
    char errbuf[PCAP_ERRBUF_SIZE];
    struct bpf_program filter;
    char *filter_string;
    bpf_u_int32 netmask;
    bpf_u_int32 localnet;
    int datalink;
+   unsigned random_seed;
+   struct timeval tv;
 /*
- *	Create an MD5 hash of various things to use as a source of random
- *	data.
+ *	Seed PRNG.
  */
-   Gettimeofday(&now);
-   pid=getpid();
-   if ((uname(&uname_buf)) !=0 ) {
-      perror("uname");
-      exit(1);
-   }
-
-   sprintf(str, "%lu %lu %u %s", now.tv_usec, now.tv_sec, pid,
-           uname_buf.nodename);
-   md5_init(&context);
-   md5_append(&context, (const md5_byte_t *)str, strlen(str));
-   md5_finish(&context, md5_digest);
+   Gettimeofday(&tv);
+   random_seed = tv.tv_usec ^ getpid();	/* Unpredictable value */
+   init_genrand(random_seed);
 /*
- *	Set the sequence number, ack number and source port using the MD5 hash
- *	if they have not been set with command line options.
+ *	Set the sequence number, ack number and source port using random
+ *	values if they have not been set with command line options.
  *	We set the top bit of source port to make sure that it's
  *	above 32768 and therefore out of the way of reserved ports
  *	(1-1024).
  */
    if (!seq_no_flag)
-      memcpy(&seq_no, md5_digest, sizeof(uint32_t));
+      seq_no = genrand_int32();
    if (!ack_no_flag)
-      memcpy(&ack_no, md5_digest+sizeof(uint32_t), sizeof(uint32_t));
+      ack_no = genrand_int32();
    if (!source_port_flag) {
-      memcpy(&source_port, md5_digest+sizeof(uint32_t)+sizeof(uint32_t),
-             sizeof(uint16_t));
+      source_port = genrand_int32() & 0x0000ffff;
       source_port |= 0x8000;
    }
 /*
@@ -1041,6 +1019,7 @@ initialise(void) {
  */
    if (portname_flag) {
       FILE *fp;
+      char *fn;
       int i;
       int n;
       char *p;
@@ -1050,10 +1029,12 @@ initialise(void) {
       unsigned int port;
       char prot[4];
 
-      if ((access(SERVICE_FILE, R_OK)) != 0)
+      fn = make_message("%s/%s", DATADIR, SERVICE_FILE);
+      if ((access(fn, R_OK)) != 0)
          err_sys("Cannot open services file");
-      if (!(fp = fopen(SERVICE_FILE, "r")))
+      if (!(fp = fopen(fn, "r")))
          err_sys("Cannot open services file");
+      free(fn);
       portnames = Malloc(65536 * sizeof(char *));
       for (i=0; i<65536; i++)
          portnames[i] = NULL;
@@ -1070,6 +1051,7 @@ initialise(void) {
             portnames[port] = make_message("%s", portname);
          }
       }
+      fclose(fp);
    }
 }
 
@@ -1165,7 +1147,7 @@ usage(int status) {
    fprintf(stderr, "\n--numeric or -N\t\tIP addresses only, no hostnames.\n");
    fprintf(stderr, "\t\t\tWith this option, all hosts must be specified as\n");
    fprintf(stderr, "\t\t\tIP addresses.  Hostnames are not permitted.\n");
-   fprintf(stderr, "\n--ipv6 or -6\t\tUse IPv6 protocol. Default is IPv4.\n");
+/*   fprintf(stderr, "\n--ipv6 or -6\t\tUse IPv6 protocol. Default is IPv4.\n"); */
 /* scanner-specific help */
    fprintf(stderr, "\n--data=<p> or -D <p>\tSpecify TCP destination port(s).\n");
    fprintf(stderr, "\t\t\tThis option can be a single port, a list of ports\n");

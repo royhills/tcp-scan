@@ -1,0 +1,502 @@
+# list originally compiled by Julian Assange (proff@suburbia.apana.org.au)
+# Extensively modified by NTA
+#
+# Note: the port name must be a maximum of 16 characters long, and may
+#       not contain the slash ("/") character.
+#
+reserved             0/tcp Reserved [JBP]        
+tcpmux               1/tcp TCP Port Service Multiplexer [MKL]     
+compressnet          2/tcp Management Utility [BV15]       
+compressnet          3/tcp Compression Process [BV15]       
+rje                  5/tcp Remote Job Entry [12,JBP]      
+echo                 7/tcp Echo [95,JBP]        
+discard              9/tcp Discard [94,JBP]        
+systat              11/tcp Active Users [89,JBP]       
+daytime             13/tcp Daytime [93,JBP]        
+netstat             15/tcp Netstat
+qotd                17/tcp Quote of the Day [100,JBP]     
+msp                 18/tcp Message Send Protocol [RXN]      
+chargen             19/tcp Character Generator [92,JBP]       
+ftp-data            20/tcp File Transfer [Default Data] [96,JBP]     
+ftp                 21/tcp File Transfer [Control] [96,JBP]      
+ssh                 22/tcp SSH Remote Login Protocol
+telnet              23/tcp Telnet [112,JBP]        
+priv-mail           24/tcp any private mail system [RA11]     
+smtp                25/tcp Simple Mail Transfer [102,JBP]      
+strafe1             26/tcp AltaVista Firewall portscan trap #1
+strafe2             27/tcp AltaVista Firewall portscan trap #2
+nsw-fe              27/tcp NSW User System FE [24,RHT]     
+strafe3             28/tcp AltaVista Firewall portscan trap #3
+strafe4             29/tcp AltaVista Firewall portscan trap #4
+msg-icp             29/tcp MSG ICP [85,RHT]       
+msg-auth            31/tcp MSG Authentication [85,RHT]       
+dsp                 33/tcp Display Support Protocol [EXC]      
+priv-print          35/tcp any private printer server [JBP]     
+time                37/tcp Time [108,JBP]        
+rlp                 39/tcp Resource Location Protocol [MA]      
+graphics            41/tcp Graphics [129,JBP]        
+nameserver          42/tcp Host Name Server [99,JBP]      
+nicname             43/tcp Who Is [55,ANM2]       
+mpm-flags           44/tcp MPM FLAGS Protocol [JBP]      
+mpm                 45/tcp Message Processing Module [recv] [98,JBP]     
+mpm-snd             46/tcp MPM [default send] [98,JBP]      
+ni-ftp              47/tcp NI FTP [134,SK8]       
+TACACS              49/tcp TACACS
+re-mail-ck          50/tcp Remote Mail Checking Protocol [171,SXD1]     
+la-maint            51/tcp IMP Logical Address Maintenance [76,AGM]     
+xns-time            52/tcp XNS Time Protocol [SXA]      
+dns                 53/tcp Domain Name Server [81,95,PM1]      
+xns-ch              54/tcp XNS Clearinghouse [SXA]       
+isi-gl              55/tcp ISI Graphics Language [7,RB9]      
+xns-auth            56/tcp XNS Authentication [SXA]       
+priv-term           57/tcp any private terminal access [JBP]     
+mtp                 57/tcp 
+xns-mail            58/tcp XNS Mail [SXA]       
+priv-file           59/tcp any private file service [JBP]     
+ni-mail             61/tcp NI MAIL [5,SK8]       
+acas                62/tcp ACA Services [EXW]       
+via-ftp             63/tcp VIA Systems - FTP [DXD]     
+covia               64/tcp Communications Integrator (CI) [TXD]      
+tacacs-ds           65/tcp TACACS-Database Service [3,KH43]       
+sql*net             66/tcp Oracle SQL*NET [JFH2]       
+bootps              67/tcp Bootstrap Protocol Server [36,WJC2]      
+bootpc              68/tcp Bootstrap Protocol Client [36,WJC2]      
+tftp                69/tcp Trivial File Transfer [126,DDC1]      
+gopher              70/tcp Gopher [MXC1]        
+netrjs-1            71/tcp Remote Job Service [10,RTB3]      
+netrjs-2            72/tcp Remote Job Service [10,RTB3]      
+netrjs-3            73/tcp Remote Job Service [10,RTB3]      
+netrjs-4            74/tcp Remote Job Service [10,RTB3]      
+priv-dial           75/tcp any private dial out service [JBP]    
+priv-rje            77/tcp any private RJE service [JBP]     
+vettcp              78/tcp vettcp [CXL1]        
+finger              79/tcp Finger [52,KLH]        
+http                80/tcp World Wide Web HTTP [TXL]     
+hosts2-ns           81/tcp HOSTS2 Name Server [EAK1]      
+xfer                82/tcp XFER Utility [TXS2]       
+mit-ml-dev          83/tcp MIT ML Device [DXR3]      
+ctf                 84/tcp Common Trace Facility [HXT]      
+mit-ml-dev          85/tcp MIT ML Device [DXR3]      
+mfcobol             86/tcp Micro Focus Cobol [SXE]      
+priv-term-l         87/tcp any private terminal link [JBP]     
+kerberos            88/tcp Kerberos [BCN]        
+su-mit-tg           89/tcp SU/MIT Telnet Gateway [MRC]      
+dnsix               90/tcp DNSIX Securit Attribute Token Map [CXW1]    
+mit-dov             91/tcp MIT Dover Spooler [EBM]      
+npp                 92/tcp Network Printing Protocol [LXM]      
+dcp                 93/tcp Device Control Protocol [DT15]      
+objcall             94/tcp Tivoli Object Dispatcher [TXB1]      
+supdup              95/tcp SUPDUP [27,MRC]        
+dixie               96/tcp DIXIE Protocol Specification [TXH1]      
+swift-rvf           97/tcp Swift Remote Vitural File Protocol [MXR]    
+tacnews             98/tcp TAC News [ANM2]       
+metagram            99/tcp Metagram Relay [GEOF]       
+newacct            100/tcp [unauthorized use]        
+hostname           101/tcp NIC Host Name Server [54,ANM2]     
+iso-tsap           102/tcp ISO-TSAP [16,MTR]        
+gppitnp            103/tcp Genesis Point-to-Point Trans Net [PXM1]     
+x400               103/tcp ISO Mail
+acr-nema           104/tcp ACR-NEMA Digital Imag. & Comm. 300 [PXM1]   
+x400-snd           104/tcp ISO Mail
+csnet-ns           105/tcp Mailbox Name Nameserver [127,MS56]      
+3com-tsmux         106/tcp 3COM-TSMUX [JXS5]        
+rtelnet            107/tcp Remote Telnet Service [101,JBP]      
+snagas             108/tcp SNA Gateway Access Server [KXM]     
+pop2               109/tcp Post Office Protocol - Version 2 [14,JKR1]   
+pop3               110/tcp Post Office Protocol - Version 3 [122,MTR]   
+sunrpc             111/tcp SUN Remote Procedure Call [DXG]     
+# sunrpc2            111/tcp SUN Remote Procedure Call [DXG]2
+mcidas             112/tcp McIDAS Data Transmission Protocol [GXD]     
+auth               113/tcp Authentication Service [130,MCSJ]       
+audionews          114/tcp Audio News Multicast [MXF2]      
+sftp               115/tcp Simple File Transfer Protocol [73,MKL1]     
+ansanotify         116/tcp ANSA REX Notify [NXH]      
+uucp-path          117/tcp UUCP Path Service [44,MAE]      
+sqlserv            118/tcp SQL Services [LXB3]       
+nntp               119/tcp Network News Transfer Protocol [65,PL4]     
+cfdptkt            120/tcp CFDPTKT [JXO3]        
+erpc               121/tcp Encore Expedited Remote Pro.Call [132,JXO]     
+smakynet           122/tcp SMAKYNET [MXO]        
+ntp                123/tcp Network Time Protocol [80,DLM1]      
+ansatrader         124/tcp ANSA REX Trader [NXH]      
+locus-map          125/tcp Locus PC-Interface Net Map Ser [137,EP53]    
+unitary            126/tcp Unisys Unitary Login [FEIL]      
+locus-con          127/tcp Locus PC-Interface Conn Server [137,EP53]     
+gss-xlicen         128/tcp GSS X License Verification [JXL]     
+pwdgen             129/tcp Password Generator Protocol [141,FJW]      
+cisco-fna          130/tcp cisco FNATIVE [WXB]       
+cisco-tna          131/tcp cisco TNATIVE [WXB]       
+cisco-sys          132/tcp cisco SYSMAINT [WXB]       
+statsrv            133/tcp Statistics Service [DLM1]       
+ingres-net         134/tcp INGRES-NET Service [MXB]       
+loc-srv            135/tcp Location Service [JXP]       
+profile            136/tcp PROFILE Naming System [LLP]      
+netbios-ns         137/tcp NETBIOS Name Service [JBP]      
+netbios-dgm        138/tcp NETBIOS Datagram Service [JBP]      
+netbios-ssn        139/tcp NETBIOS Session Service [JBP]      
+emfis-data         140/tcp EMFIS Data Service [GB7]      
+emfis-cntl         141/tcp EMFIS Control Service [GB7]      
+bl-idm             142/tcp Britton-Lee IDM [SXS1]       
+imap2              143/tcp Interim Mail Access Protocol v2 [MRC]    
+news               144/tcp NewS window system [JAG]        
+uaac               145/tcp UAAC Protocol [DAG4]       
+iso-tp0            146/tcp ISO-IP0 [86,MTR]        
+iso-ip             147/tcp ISO-IP [MTR]        
+cronus             148/tcp CRONUS-SUPPORT [135,JXB]        
+aed-512            149/tcp AED 512 Emulation Service [AXB]     
+sql-net            150/tcp SQL-NET [MXP]        
+hems               151/tcp HEMS [87,CXT]        
+bftp               152/tcp Background File Transfer Program [AD14]     
+sgmp               153/tcp SGMP [37,MS9]        
+netsc-prod         154/tcp NETSC [SH37]        
+netsc-dev          155/tcp NETSC [SH37]        
+sqlsrv             156/tcp SQL Service [CMR]       
+knet-cmp           157/tcp KNET/VM Command/Message Protocol[77,GSM11]       
+pcmail-srv         158/tcp PCMail Server [19,MXL]       
+nss-routing        159/tcp NSS-Routing [JXR]        
+sgmp-traps         160/tcp SGMP-TRAPS [37,MS9]        
+snmp               161/tcp SNMP [15,MTR]        
+snmptrap           162/tcp SNMPTRAP [15,MTR]        
+cmip-man           163/tcp CMIP/TCP Manager [4,AXB1]       
+cmip-agent         164/tcp CMIP/TCP Agent [4,AXB1]       
+xns-courier        165/tcp Xerox 144,SXA]        
+s-net              166/tcp Sirius Systems [BXL]       
+namp               167/tcp NAMP [MS9]        
+rsvd               168/tcp RSVD [NT12]        
+send               169/tcp SEND [WDW11]        
+print-srv          170/tcp Network PostScript [BKR]       
+multiplex          171/tcp Network Innovations Multiplex [KXD]      
+cl-1               172/tcp Network Innovations CL/1 [KXD]      
+xyplex-mux         173/tcp Xyplex [BXS]        
+mailq              174/tcp MAILQ [RXZ]        
+vmnet              175/tcp VMNET [CXT]        
+genrad-mux         176/tcp GENRAD-MUX [RXT]        
+xdmcp              177/tcp X Display Manager Control Protocol [RWS4]    
+nextstep           178/tcp NextStep Window Server [LXH]      
+bgp                179/tcp Border Gateway Protocol [KSL]      
+ris                180/tcp Intergraph [DXB]        
+unify              181/tcp Unify [VXS]        
+audit              182/tcp Unisys Audit SITP [GXG]      
+ocbinder           183/tcp OCBinder [JXO1]        
+ocserver           184/tcp OCServer [JXO1]        
+remote-kis         185/tcp Remote-KIS [RXD1]        
+kis                186/tcp KIS Protocol [RXD1]       
+aci                187/tcp Application Communication Interface [RXC1]      
+mumps              188/tcp Plus Five's MUMPS [HS23]      
+qft                189/tcp Queued File Transport [WXS]      
+gacp               190/tcp Gateway Access Control Protocol [PCW]     
+prospero           191/tcp Prospero [BCN]        
+osu-nms            192/tcp OSU Network Monitoring System [DXK]     
+srmp               193/tcp Spider Remote Monitoring Protocol [TXS]     
+irc                194/tcp Internet Relay Chat Protocol [JXO2]     
+dn6-nlm-aud        195/tcp DNSIX Network Level Module Audit [LL69]    
+dn6-smm-red        196/tcp DNSIX Session Mgt Module Audit Redir[LL69]    
+dls                197/tcp Directory Location Service [SXB]      
+dls-mon            198/tcp Directory Location Service Monitor [SXB]     
+smux               199/tcp SMUX [MTR]        
+src                200/tcp IBM System Resource Controller [GXM]     
+at-rtmp            201/tcp AppleTalk Routing Maintenance [RXC]      
+at-nbp             202/tcp AppleTalk Name Binding [RXC]      
+at-3               203/tcp AppleTalk Unused [RXC]       
+at-echo            204/tcp AppleTalk Echo [RXC]       
+at-5               205/tcp AppleTalk Unused [RXC]       
+at-zis             206/tcp AppleTalk Zone Information [RXC]      
+at-7               207/tcp AppleTalk Unused [RXC]       
+at-8               208/tcp AppleTalk Unused [RXC]       
+tam                209/tcp Trivial Authenticated Mail Protocol [DXB1]     
+z39.50             210/tcp ANSI Z39.50 [MXN]       
+914c-g             211/tcp Texas Instruments 914C/G Terminal [BXH1]     
+anet               212/tcp ATEXSSTR [JXT]        
+ipx                213/tcp IPX [DP666]        
+vmpwscs            214/tcp VM PWSCS [DXS]       
+softpc             215/tcp Insignia Solutions [MXT]       
+atls               216/tcp Access Technology License Server [LXD]     
+dbase              217/tcp dBASE Unix [DXG1]       
+mpp                218/tcp Netix Message Posting Protocol [STY]     
+uarps              219/tcp Unisys ARPs [AXM1]       
+imap3              220/tcp Interactive Mail Access Protocol v3 [JXR2]    
+fln-spx            221/tcp Berkeley rlogind with SPX auth [KXA]    
+fsh-spx            222/tcp Berkeley rshd with SPX auth [KXA]    
+cdc                223/tcp Certificate Distribution Center [KXA]      
+sur-meas           243/tcp Survey Measurement [6,DDC1]       
+link               245/tcp LINK [1,RDB2]        
+dsp3270            246/tcp Display Systems Protocol [39,WJS1]      
+fw1                256/tcp Firewall-1
+fw1-log            257/tcp Firewall-1 Logging
+fw1-mgmt           258/tcp Firewall-1 Management
+fw1-ClientAuth     259/tcp Firewall-1 Client Authentication
+fw1-SessAuth       261/tcp Firewall-1 Session Authentication
+fw1-SecRem4-1      264/tcp Firewall-1 SecuRemote ver 4.1
+fw1-PubKey4-1      265/tcp VPN-1 Public Key Transfer
+pawserv            345/tcp Perf Analysis Workbench       
+zserv              346/tcp Zebra server        
+fatserv            347/tcp Fatmen Server        
+clearcase          371/tcp Clearcase [DXL1]        
+ulistserv          372/tcp Unix Listserv [AXK]       
+legent-1           373/tcp Legent Corporation [KXB]       
+legent-2           374/tcp Legent Corporation [KXB]       
+ldap               389/tcp
+Timbuktu           407/tcp Timbuktu remote access
+raptor-mgmt-1      416/tcp Raptor Management
+raptor-mgmt-2      417/tcp Raptor Management
+raptor-mgmt-3      418/tcp Raptor Management
+raptor-srl         423/tcp Raptor Management
+raptor-isakmp      424/tcp Raptor ISAKMP
+raptor-log         425/tcp Raptor Remote Logging
+https              443/tcp Secure HTTP
+smb-tcpip          445/tcp Microsoft SMB over TCP/IP (2000, XP)
+ssmtp              465/tcp Secure SMTP
+raptor-mgmt-4      481/tcp Raptor Management
+exec               512/tcp remote process execution (rexecd)
+login              513/tcp remote login (rlogind)       
+shell              514/tcp rlogin style exec (rshd)
+# cmd                514/tcp rlogin style exec (rshd)
+printer            515/tcp spooler (lpd)
+talk               517/tcp 
+ntalk              518/tcp (talkd)
+utime              519/tcp unixtime         
+efs                520/tcp extended file name server      
+timed              525/tcp timeserver         
+tempo              526/tcp newdate         
+courier            530/tcp rpc         
+conference         531/tcp chat         
+netnews            532/tcp readnews         
+netwall            533/tcp for emergency broadcasts       
+uucp               540/tcp uucpd         
+klogin             543/tcp          
+kshell             544/tcp krcmd         
+new-rwho           550/tcp new-who         
+dsf                555/tcp          
+remotefs           556/tcp rfs server        
+rmonitor           560/tcp rmonitord         
+monitor            561/tcp          
+chshell            562/tcp chcmd         
+nntp-ssl           563/tcp NNTP over SSL
+9pfs               564/tcp plan 9 file service      
+whoami             565/tcp whoami         
+meter              570/tcp demon         
+meter              571/tcp udemon         
+submission         587/tcp Mail Message Submission RFC 2476
+ipcserver          600/tcp Sun IPC server       
+pcserver           600/tcp ECD Integrated PC board srvr
+nqs                607/tcp nqs         
+authserver         666/tcp AltaVista authserver
+mdqs               666/tcp          
+snkserver          666/tcp AltaVista snkserver
+securidserver      668/tcp AltaVista securidserver
+rwwserver          669/tcp AltaVista rwwserver
+pwserver           670/tcp AltaVista pwserver
+onpwserver         671/tcp AltaVista onpwserver
+skeyserver         672/tcp AltaVista skeyserver
+cryptoserver       673/tcp AltaVista cryptoserver
+elcsd              704/tcp errlog copy/server daemon       
+netcp              740/tcp NETscout Control Protocol [AXS2]      
+netgw              741/tcp netGW [OXK]        
+netrcs             742/tcp Network based Rev. Cont. Sys. [GXC2]    
+flexlm             744/tcp Flexible License Manager [MXC2]      
+fujitsu-dev        747/tcp Fujitsu Device Control       
+ris-cm             748/tcp Russell Info Sci Calendar Manager     
+kerberos-adm       749/tcp kerberos administration        
+rfile              750/tcp          
+pump               751/tcp          
+qrh                752/tcp          
+rrh                753/tcp          
+tell               754/tcp send         
+nlogin             758/tcp          
+con                759/tcp          
+ns                 760/tcp          
+rxe                761/tcp          
+quotad             762/tcp          
+cycleserv          763/tcp          
+omserv             764/tcp          
+webster            765/tcp          
+phonebook          767/tcp phone         
+vid                769/tcp          
+cadlock            770/tcp          
+rtip               771/tcp          
+cycleserv2         772/tcp          
+submit             773/tcp          
+rpasswd            774/tcp          
+entomb             775/tcp          
+wpages             776/tcp          
+wpgs               780/tcp          
+hp-collector       781/tcp hp performance data collector      
+hp-managed-node    782/tcp hp performance data managed node     
+hp-alarm-mgr       783/tcp hp performance data alarm manager     
+remotelypossible   799/tcp Remotely Possible PC remote control
+remotelypossible   800/tcp Remotely Possible PC remote control
+mdbs_daemon        800/tcp          
+device             801/tcp          
+3com-netbuilder    855/tcp Unknown, seen on 3COM Netbuilder routers
+rsync              873/tcp
+raptor-ooba        888/tcp Raptor out-of-band auth
+sun-mgmt-console   898/tcp Sun Management Console
+fw1ClientAuthWeb   900/tcp Firewall-1 Client Authentication Web 
+xtreelic           996/tcp XTREE License Server       
+maitrd             997/tcp          
+busboy             998/tcp          
+garcon             999/tcp          
+puprouter          999/tcp          
+cadlock           1000/tcp          
+# blackjack         1025/tcp network blackjack        
+# listen            1025/tcp listener RFS remote_file_sharing
+# nterm             1026/tcp remote_login network_terminal
+socks             1080/tcp
+xaudio            1103/tcp
+mSQL1             1114/tcp mSQL
+hermes            1248/tcp          
+bbn-mmc           1347/tcp multi media conferencing       
+bbn-mmx           1348/tcp multi media conferencing       
+sbook             1349/tcp Registration Network Protocol [SXS4]      
+editbench         1350/tcp Registration Network Protocol [SXS4]      
+equationbuilder   1351/tcp Digital Tool Works (MIT) [TXT1]     
+lotusnote         1352/tcp Lotus Note [GXP1]       
+ms-sql-server     1433/tcp MS SQL Server
+CitrixICA         1494/tcp Citrix ICA
+sqlnet            1521/tcp Oracle SQLnet
+ingreslock        1524/tcp ingres         
+orasrv            1525/tcp oracle         
+prospero-np       1525/tcp prospero non-privileged        
+tlisrv            1527/tcp oracle         
+coauthor          1529/tcp oracle         
+issd              1600/tcp          
+tnet              1600/tcp transputer net daemon
+pmconsole         1643/tcp Livingston Portmaster Console
+nkd               1650/tcp          
+pptp              1723/tcp PPTP
+radius            1812/tcp
+miniweb           1959/tcp Bordermanager MiniWeb Server
+# csatpxy           2000/tcp Bordermanager CS Audit Trail Proxy Agent
+RemotelyAnywhere  2000/tcp Remotely Anywhere remote access
+# RemotelyAnywhere  2001/tcp Remotely Anywhere remote access
+# callbook          2000/tcp          
+cisco-tty1        2001/tcp Cisco terminal port access
+# dc                2001/tcp          
+globe             2002/tcp          
+mailbox           2004/tcp          
+berknet           2005/tcp          
+invokator         2006/tcp          
+dectalk           2007/tcp          
+conf              2008/tcp          
+news              2009/tcp          
+search            2010/tcp          
+raid-cc           2011/tcp raid         
+ttyinfo           2012/tcp          
+raid-am           2013/tcp          
+troff             2014/tcp          
+cypress           2015/tcp          
+bootserver        2016/tcp          
+cypress-stat      2017/tcp          
+terminaldb        2018/tcp          
+whosockami        2019/tcp          
+xinupageserver    2020/tcp          
+servexec          2021/tcp          
+down              2022/tcp          
+xinuexpansion3    2023/tcp          
+xinuexpansion4    2024/tcp          
+ellpack           2025/tcp          
+scrabble          2026/tcp          
+shadowserver      2027/tcp          
+submitserver      2028/tcp          
+device2           2030/tcp          
+blackboard        2032/tcp          
+glogger           2033/tcp          
+scoremgr          2034/tcp          
+imsldoc           2035/tcp          
+objectmanager     2038/tcp          
+lam               2040/tcp          
+interbase         2041/tcp          
+isis              2042/tcp          
+isis-bcast        2043/tcp          
+rimsl             2044/tcp          
+cdfunc            2045/tcp          
+sdfunc            2046/tcp          
+dls               2047/tcp          
+dls-monitor       2048/tcp          
+nfs               2049/tcp networked file system
+listen            2766/tcp
+www-dev           2784/tcp world wide web - development     
+afbackup          2988/tcp
+afmbackup         2989/tcp
+NSWS              3049/tcp          
+AD-GC             3268/tcp Active Directory Global Catalogue
+AD-GC-SSL         3269/tcp Active Directory Global Catalogue over SSL
+mysql             3306/tcp MySQL
+msdtc             3372/tcp Microsoft Distributed Transaction Coordinator
+WindowsTS         3389/tcp Windows Terminal Services
+v-one-spp         3845/tcp V-ONE Single Port Proxy
+cisco-tty2        4001/tcp Cisco terminal port access
+nfs-lockmgr       4045/tcp NFS Lock Manager
+mSQL2             4333/tcp mSQL
+rfa               4672/tcp remote file access server      
+# ssdp-discovery    5000/tcp SSDP Discovery (Win-XP Universal PnP)
+UPnP              5000/tcp Universal Plug and Play (WinXP)
+# commplex-main     5000/tcp          
+commplex-link     5001/tcp          
+rfe               5002/tcp radio free ethernet       
+rmonitor_secure   5145/tcp          
+padl2sim          5236/tcp          
+postgres          5432/tcp
+pc-anywhere1      5631/tcp PC Anywhere Data
+pc-anywhere2      5632/tcp PC Anywhere Status
+vnc-web           5800/tcp VNC over HTTP
+vnc-web           5801/tcp VNC over HTTP
+vnc               5900/tcp VNC
+vnc               5901/tcp VNC
+sunmgmtconsole2   5987/tcp Sun Management Console Child
+sunmgmtconsole3   5988/tcp Sun Management Console Child
+xterm             6000/tcp x-windows server
+cisco-tty3        6001/tcp Cisco terminal port access
+sub-process       6111/tcp HP SoftBench Sub-Process Control      
+dtspc             6112/tcp
+xdsxdm            6558/tcp          
+altavista-tunnel  6660/tcp AltaVista Tunnel
+irc-serv          6666/tcp internet relay chat server      
+irc               6667/tcp internet relay chat       
+afs3-fileserver   7000/tcp file server itself       
+dos               7000/tcp msdos
+afs3-callback     7001/tcp callbacks to cache managers      
+afs3-prserver     7002/tcp users & groups database      
+afs3-vlserver     7003/tcp volume location database       
+afs3-kaserver     7004/tcp AFS/Kerberos authentication service       
+afs3-volser       7005/tcp volume managment server       
+afs3-errors       7006/tcp error interpretation service       
+afs3-bos          7007/tcp basic overseer process       
+afs3-update       7008/tcp server-to-server updater        
+afs3-rmtsys       7009/tcp remote cache manager service      
+realaudio         7070/tcp RealAudio
+font-service      7100/tcp
+gauntlet-auth     7777/tcp Gauntlet Firewall Authentication
+web-cache         8080/tcp Web Cache
+altavista-gui     8314/tcp AltaVista GUI management
+cisco-tty4        9001/tcp Cisco terminal port access
+man               9535/tcp          
+amandaidx        10082/tcp
+amidxtape        10083/tcp
+isode-dua        17007/tcp          
+fw1-omi          18185/tcp
+fw1_omi-sic      18186/tcp
+fw1-cpmi         18190/tcp
+fw1-cpd          18191/tcp
+fw1-cpd-amon     18192/tcp
+fw1-amon         18193/tcp
+fw1-cp-rtm       18202/tcp
+fw1-cp-reporting 18205/tcp
+fw1-pslogon      18207/tcp
+fw1-cprid        18208/tcp
+fw1-ica-sic      18209/tcp
+fw1-ica-pull     18210/tcp
+fw1-ica-push     18211/tcp
+fw1-cp-redundant 18221/tcp
+fw1-pslogon-ng   18231/tcp
+fw1-sds-logon    18232/tcp
+fw1-cp-exnet-pk  18262/tcp
+fw1-cp-exnet-re  18263/tcp
+fw1-ica-services 18264/tcp
+fw1-ica-mgmt     18265/tcp
+fw1-netso        19190/tcp
+fw1-uaa          19191/tcp
+fw1-sds-logon-ng 65524/tcp
+mimesweeper-mgmt 20200/tcp MIMEsweeper remote management
+ReachOut         43188/tcp Reachout remote access
+pc-anywhere3     65301/tcp PC Anywhere Status
