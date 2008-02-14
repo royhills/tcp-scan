@@ -1,7 +1,7 @@
 dnl $Id$
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT([tcp-scan], [1.13], [tcp-scan@nta-monitor.com])
+AC_INIT([tcp-scan], [1.14], [tcp-scan@nta-monitor.com])
 AC_PREREQ(2.59)
 AC_REVISION($Revision$)
 AC_CONFIG_SRCDIR([tcp-scan.c])
@@ -98,6 +98,23 @@ AC_CHECK_FUNCS([malloc gethostbyname gettimeofday inet_ntoa memset select socket
 dnl Determine type for 3rd arg to accept()
 dnl This is normally socklen_t, but can sometimes be size_t or int.
 AC_NTA_NET_SIZE_T
+
+dnl Check if the Posix regular expression functions "regcomp" and "regexec"
+dnl and the header file "regex.h" are present.
+AC_MSG_CHECKING([for posix regular expression support])
+AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+#include <sys/types.h>
+#include <regex.h>]],
+[[regcomp(0, 0, 0);
+regexec(0, 0, 0, 0, 0)]])],
+[ac_nta_posix_regex=yes],
+[ac_nta_posic_regex=no])
+AC_MSG_RESULT([$ac_nta_posix_regex])
+if test $ac_nta_posix_regex = no; then
+   AC_MSG_ERROR([You don't seem to have posix regular expression support])
+else
+   AC_DEFINE(HAVE_REGEX_H, 1, [Define to 1 if you have posix regex support])
+fi
 
 dnl GNU systems e.g. Linux have getopt_long_only, but many other systems
 dnl e.g. FreeBSD 4.3 and Solaris 8 do not.  For systems that don't have it,

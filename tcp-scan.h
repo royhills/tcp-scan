@@ -1,5 +1,5 @@
 /*
- * The TCP Scanner (tcp-scan) is Copyright (C) 2003-2007 Roy Hills,
+ * The TCP Scanner (tcp-scan) is Copyright (C) 2003-2008 Roy Hills,
  * NTA Monitor Ltd.
  *
  * This program is free software; you can redistribute it and/or
@@ -89,6 +89,10 @@
 
 #ifdef HAVE_ARPA_INET_H
 #include <arpa/inet.h>
+#endif
+
+#ifdef HAVE_REGEX_H
+#include <regex.h>	/* Posix regular expression support */
 #endif
 
 #ifdef HAVE_PCAP_H

@@ -1,5 +1,5 @@
 /*
- * The TCP Scanner (tcp-scan) is Copyright (C) 2003-2007 Roy Hills,
+ * The TCP Scanner (tcp-scan) is Copyright (C) 2003-2008 Roy Hills,
  * NTA Monitor Ltd.
  *
  * This program is free software; you can redistribute it and/or
@@ -1021,37 +1021,109 @@ initialise(void) {
       FILE *fp;
       char *fn;
       int i;
-      int n;
-      char *p;
       char lbuf[MAXLINE];
-      char desc[256];
-      char portname[17];
+      char portname[MAXLINE];
+      char portstr[MAXLINE];
       unsigned int port;
-      char prot[4];
-
+      static const char *servent_pat_str = "^([^\t ]+)[\t ]+([0-9]+)/tcp";
+      regex_t servent_pat;
+      int result;
+      int num_entries=0;
+      regmatch_t pmatch[3];
+      size_t name_len;
+      size_t port_len;
+/*
+ *	Compile service file regular expression.
+ *	Die if any error occurs.
+ */
+      if ((result=regcomp(&servent_pat, servent_pat_str, REG_EXTENDED|REG_ICASE))) {
+         char errbuf[MAXLINE];
+         size_t errlen;
+         errlen=regerror(result, &servent_pat, errbuf, MAXLINE);
+         err_msg("ERROR: cannot compile regex pattern \"%s\": %s",
+                 servent_pat_str, errbuf);
+      }
+/*
+ *	Determine the filename for the services file, and open this file
+ *	for reading.
+ */
       fn = make_message("%s/%s", DATADIR, SERVICE_FILE);
       if ((access(fn, R_OK)) != 0)
          err_sys("Cannot open services file");
       if (!(fp = fopen(fn, "r")))
          err_sys("Cannot open services file");
       free(fn);
+/*
+ *	Create a 65,536 element array of character pointers with each
+ *	initialised to NULL.
+ */
       portnames = Malloc(65536 * sizeof(char *));
       for (i=0; i<65536; i++)
          portnames[i] = NULL;
+
       while (fgets(lbuf, MAXLINE, fp)) {
-         if (strchr("*# \t\n", lbuf[0]))
+/*
+ *	Ignore blank lines, lines starting with "#" and lines starting
+ *	with whitespace.
+ */
+         if (strchr("# \t\n", lbuf[0]))
              continue;
-         if (!(p = strchr (lbuf, '/')))
-             continue;
-         *p = ' ';
-         desc[0]='\0';
-         n=sscanf(lbuf, "%16s %u %3s %255[^\r\n]", portname, &port, prot,
-                  desc);
-         if (n >= 3 && !strcmp(prot, "tcp") && (port < 65536)) {
-            portnames[port] = make_message("%s", portname);
+/*
+ *	Attempt to match the line against the service entry regular
+ *	expression.  Ignore lines that don't match.  Die on error.
+ */
+         result = regexec(&servent_pat, lbuf, 3, pmatch, 0);
+         if (result == REG_NOMATCH || pmatch[1].rm_so < 0 || pmatch[2].rm_so < 0) {
+            continue;
+         } else if (result != 0) {
+            char errbuf[MAXLINE];
+            size_t errlen;
+            errlen=regerror(result, &servent_pat, errbuf, MAXLINE);
+            err_msg("ERROR: backoff pattern match regexec failed: %s", errbuf);
          }
+/*
+ *	Obtain the port name and port number using the pmatch offsets
+ *	set by the regex match.
+ */
+         name_len = pmatch[1].rm_eo - pmatch[1].rm_so;
+         if (name_len >= sizeof(portname)) {
+            name_len = sizeof(portname) - 1;
+         }
+         port_len = pmatch[2].rm_eo - pmatch[2].rm_so;
+            if (port_len >= sizeof(portstr)) {
+            port_len = sizeof(portstr) - 1;
+         }
+         memcpy(portname, lbuf+pmatch[1].rm_so, name_len);
+         portname[name_len] = '\0';
+         memcpy(portstr, lbuf+pmatch[2].rm_so, port_len);
+         portstr[port_len] = '\0';
+/*
+ *	Convert the port number string to an integer, and check that it
+ *	is in range.
+ */
+         port = Strtoul(portstr, 10);
+         if (port > 65535) {
+            warn_msg("WARNING: port number %s for service %s is out of range",
+                     portstr, portname);
+            continue;
+         }
+/*
+ *	Leave this entry unchanged if it already has an associated name.
+ */
+         if (portnames[port] != NULL) {
+            continue;
+         }
+/*
+ *	Add a pointer to the port name to the appropriate entry in the
+ *	port names array.
+ */
+         portnames[port] = make_message("%s", portname);
+         num_entries++;
       }
       fclose(fp);
+      if (verbose) {
+         warn_msg("--- %d services loaded", num_entries);
+      }
    }
 }
 
@@ -1877,7 +1949,7 @@ process_options(int argc, char *argv[]) {
 void
 tcp_scan_version (void) {
    fprintf(stderr, "%s\n\n", PACKAGE_STRING);
-   fprintf(stderr, "Copyright (C) 2003-2007 Roy Hills, NTA Monitor Ltd.\n");
+   fprintf(stderr, "Copyright (C) 2003-2008 Roy Hills, NTA Monitor Ltd.\n");
    fprintf(stderr, "tcp-scan comes with NO WARRANTY to the extent permitted by law.\n");
    fprintf(stderr, "You may redistribute copies of arp-scan under the terms of the GNU\n");
    fprintf(stderr, "General Public License.\n");

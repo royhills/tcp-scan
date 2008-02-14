@@ -1,5 +1,17 @@
 $Id$
 
+2008-02-04 Roy Hills <Roy.Hills@nta-monitor.com>
+
+	* configure.ac, tcp-scan.h: Add Posix regular expression support with
+	  header file regex.h.
+
+	* configure.ac: Increment version number to 1.14.
+
+	* tcp-scan.c: Improved algorithm to create port name map from
+	  services file.  This new algorithm uses Posix regex functions.
+
+	* tcp-scan-services: Improved port list in services file.
+
 2007-12-31 Roy Hills <Roy.Hills@nta-monitor.com>
 
 	* tcp-scan.c: Use mersenne twister PRNG to generate random values
