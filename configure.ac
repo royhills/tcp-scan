@@ -1,7 +1,7 @@
 dnl $Id$
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT([tcp-scan], [1.14], [tcp-scan@nta-monitor.com])
+AC_INIT([tcp-scan], [1.15], [tcp-scan@nta-monitor.com])
 AC_PREREQ(2.59)
 AC_REVISION($Revision$)
 AC_CONFIG_SRCDIR([tcp-scan.c])

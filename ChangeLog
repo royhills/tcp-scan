@@ -2,6 +2,27 @@ $Id$
 
 2008-02-04 Roy Hills <Roy.Hills@nta-monitor.com>
 
+	* tcp-scan.c: Improved get_source_ip function: close socket descriptor
+	  after use, and give better error message if the interface has no
+	  IP address.
+
+	* tcp-scan.c: Added new --port (-p) option to replace the now
+	  depreciated --data (-D) option.
+
+	* tcp-scan.c: Modified usage() so that it can output either brief or
+	  detailed help output depending on a new "detailed" argument.  Now,
+	  detailed output, including information on the available options, is
+	  only displayed when ike-scan is run with the --help option.  For
+	  error conditions such as incorrect options, it only produces brief
+	  output.
+
+	* tcp-scan.c: Added --servicefile2 (-E) option to allow the TCP service
+	  filename to be specified.
+
+	* configure.ac: Increment version number to 1.15.
+
+2008-02-04 Roy Hills <Roy.Hills@nta-monitor.com>
+
 	* configure.ac, tcp-scan.h: Add Posix regular expression support with
 	  header file regex.h.
 

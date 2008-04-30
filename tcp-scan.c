@@ -65,7 +65,7 @@ int tcp_flags_flag=0;			/* Specify outbound TCP flags */
 tcp_flags_struct tcp_flags;		/* Specified TCP flags */
 char **portnames=NULL;
 unsigned live_count;			/* Number of entries awaiting reply */
-
+char service_file[MAXLINE];		/* TCP Service file name */
 int verbose = 0;			/* Verbose level */
 int debug = 0;				/* Debug flag */
 char *local_data=NULL;			/* Local data from --data option */
@@ -113,6 +113,10 @@ main(int argc, char *argv[]) {
    const int on = 1;            /* For setsockopt */
    int i;
 /*
+ *	Initialise file names to the empty string.
+ */
+   service_file[0] = '\0';
+/*
  *      Process options.
  */
    process_options(argc, argv);
@@ -146,7 +150,7 @@ main(int argc, char *argv[]) {
  */
    if (!filename_flag)
       if ((argc - optind) < 1)
-         usage(EXIT_FAILURE);
+         usage(EXIT_FAILURE, 0);
 /*
  *      Populate the list from the specified file if --file was specified, or
  *      otherwise from the remaining command line arguments.
@@ -1047,7 +1051,11 @@ initialise(void) {
  *	Determine the filename for the services file, and open this file
  *	for reading.
  */
-      fn = make_message("%s/%s", DATADIR, SERVICE_FILE);
+      if (*service_file == '\0') {	/* If service file not specified */
+         fn = make_message("%s/%s", DATADIR, SERVICE_FILE);
+      } else {
+         fn = make_message("%s", service_file);
+      }
       if ((access(fn, R_OK)) != 0)
          err_sys("Cannot open services file");
       if (!(fp = fopen(fn, "r")))
@@ -1159,138 +1167,159 @@ clean_up(void) {
  *
  *	Inputs:
  *
- *	status	Status value to pass to exit()
+ *	status		Status value to pass to exit()
+ *	detailed	zero for brief output, non-zero for detailed output
+ *
+ *	Returns:
+ *
+ *	None (this function never returns).
  */
 void
-usage(int status) {
+usage(int status, int detailed) {
    fprintf(stderr, "Usage: tcp-scan [options] [hosts...]\n");
    fprintf(stderr, "\n");
-   fprintf(stderr, "Hosts are specified on the command line unless the --file option is specified.\n");
-   fprintf(stderr, "Each host uses %u bytes of memory.\n",
-           sizeof(host_entry) + sizeof(host_entry *));
+   fprintf(stderr, "Target hosts are specified on the command line unless the --file option is used,\n");
+   fprintf(stderr, "in which case the targets are read from the specified file instead.\n");
    fprintf(stderr, "\n");
-   fprintf(stderr, "Options:\n");
+   fprintf(stderr, "The target hosts can be specified as IP addresses or hostnames.\n");
    fprintf(stderr, "\n");
-   fprintf(stderr, "--help or -h\t\tDisplay this usage message and exit.\n");
-   fprintf(stderr, "\n--file=<fn> or -f <fn>\tRead hostnames or addresses from the specified file\n");
-   fprintf(stderr, "\t\t\tinstead of from the command line. One name or IP\n");
-   fprintf(stderr, "\t\t\taddress per line.  Use \"-\" for standard input.\n");
-   fprintf(stderr, "\n--retry=<n> or -r <n>\tSet total number of attempts per host to <n>,\n");
-   fprintf(stderr, "\t\t\tdefault=%d.\n", retry);
-   fprintf(stderr, "\n--timeout=<n> or -t <n>\tSet initial per host timeout to <n> ms, default=%d.\n", timeout);
-   fprintf(stderr, "\t\t\tThis timeout is for the first packet sent to each host.\n");
-   fprintf(stderr, "\t\t\tsubsequent timeouts are multiplied by the backoff\n");
-   fprintf(stderr, "\t\t\tfactor which is set with --backoff.\n");
-   fprintf(stderr, "\n--interval=<n> or -i <n> Set minimum packet interval to <n> ms, default=%d.\n", interval/1000);
-   fprintf(stderr, "\t\t\tThis controls the outgoing bandwidth usage by limiting\n");
-   fprintf(stderr, "\t\t\tthe rate at which packets can be sent.  The packet\n");
-   fprintf(stderr, "\t\t\tinterval will be no smaller than this number.\n");
-   fprintf(stderr, "\t\t\tThe interval specified is in milliseconds by default.\n");
-   fprintf(stderr, "\t\t\tif \"u\" is appended to the value, then the interval\n");
-   fprintf(stderr, "\t\t\tis in microseconds, and if \"s\" is appended, the\n");
-   fprintf(stderr, "\t\t\tinterval is in seconds.\n");
-   fprintf(stderr, "\t\t\tIf you want to use up to a given bandwidth, then it is\n");
-   fprintf(stderr, "\t\t\teasier to use the --bandwidth option instead.\n");
-   fprintf(stderr, "\n--bandwidth=<n> or -B <n> Set desired outbound bandwidth to <n>.\n");
-   fprintf(stderr, "\t\t\tThe value is in bits per second by default.  If you\n");
-   fprintf(stderr, "\t\t\tappend \"K\" to the value, then the units are kilobits\n");
-   fprintf(stderr, "\t\t\tper sec; and if you append \"M\" to the value, the\n");
-   fprintf(stderr, "\t\t\tunits are megabits per second.\n");
-   fprintf(stderr, "\t\t\tThe \"K\" and \"M\" suffixes represent the decimal, not\n");
-   fprintf(stderr, "\t\t\tbinary, multiples.  So 64K is 64000, not 65536.\n");
-   fprintf(stderr, "\t\t\tYou cannot specify both --interval and --bandwidth\n");
-   fprintf(stderr, "\t\t\tbecause they are just different ways to change the\n");
-   fprintf(stderr, "\t\t\tsame parameter.\n");
-   fprintf(stderr, "\n--backoff=<b> or -b <b>\tSet timeout backoff factor to <b>, default=%.2f.\n", backoff_factor);
-   fprintf(stderr, "\t\t\tThe per-host timeout is multiplied by this factor\n");
-   fprintf(stderr, "\t\t\tafter each timeout.  So, if the number of retrys\n");
-   fprintf(stderr, "\t\t\tis 3, the initial per-host timeout is 500ms and the\n");
-   fprintf(stderr, "\t\t\tbackoff factor is 1.5, then the first timeout will be\n");
-   fprintf(stderr, "\t\t\t500ms, the second 750ms and the third 1125ms.\n");
-   fprintf(stderr, "\n--verbose or -v\t\tDisplay verbose progress messages.\n");
-   fprintf(stderr, "\t\t\tUse more than once for greater effect:\n");
-   fprintf(stderr, "\t\t\t1 - Show when hosts are removed from the list and\n");
-   fprintf(stderr, "\t\t\t    when packets with invalid cookies are received.\n");
-   fprintf(stderr, "\t\t\t2 - Show each packet sent and received.\n");
-   fprintf(stderr, "\t\t\t3 - Display the host list before\n");
-   fprintf(stderr, "\t\t\t    scanning starts.\n");
-   fprintf(stderr, "\n--version or -V\t\tDisplay program version and exit.\n");
-   fprintf(stderr, "\n--random or -R\t\tRandomise the host list.\n");
-   fprintf(stderr, "\n--numeric or -N\t\tIP addresses only, no hostnames.\n");
-   fprintf(stderr, "\t\t\tWith this option, all hosts must be specified as\n");
-   fprintf(stderr, "\t\t\tIP addresses.  Hostnames are not permitted.\n");
-/*   fprintf(stderr, "\n--ipv6 or -6\t\tUse IPv6 protocol. Default is IPv4.\n"); */
-/* scanner-specific help */
-   fprintf(stderr, "\n--data=<p> or -D <p>\tSpecify TCP destination port(s).\n");
-   fprintf(stderr, "\t\t\tThis option can be a single port, a list of ports\n");
-   fprintf(stderr, "\t\t\tseparated by commas, or an inclusive range with the\n");
-   fprintf(stderr, "\t\t\tbounds separated by \"-\".\n");
-   fprintf(stderr, "\n--sport=<p> or -s <p>\tSpecify TCP source port.\n");
-   fprintf(stderr, "\t\t\tThe default is a random port in the range 32678-65535.\n");
-   fprintf(stderr, "\n--seq=<s> or -e <s>\tSpecify initial sequence number.\n");
-   fprintf(stderr, "\t\t\tThe default initial sequence number is random.\n");
-   fprintf(stderr, "\n--ack=<a> or -c <a>\tSpecify initial acknowledgement number.\n");
-   fprintf(stderr, "\t\t\tThe default initial acknowledgement number is random.\n");
-   fprintf(stderr, "\t\t\tThis is only applicable when the ACK flag is set in\n");
-   fprintf(stderr, "\t\t\toutgoing packets.\n");
-   fprintf(stderr, "\n--window=<w> or -w <w>\tSpecify the TCP window size.\n");
-   fprintf(stderr, "\t\t\tThe default window size is %u.\n", DEFAULT_WINDOW);
-   fprintf(stderr, "\n--openonly or -o\tOnly display open ports.\n");
-   fprintf(stderr, "\t\t\tWith this option, closed ports are not displayed.\n");
-   fprintf(stderr, "\n--servicefile=<s> or -S <s>\tUse service file <s> for TCP ports\n");
-   fprintf(stderr, "\t\t\tIf this option is specified, then the TCP ports to\n");
-   fprintf(stderr, "\t\t\tscan are read from the specified file.  The file is\n");
-   fprintf(stderr, "\t\t\tsame format as used by \"strobe\".\n");
-   fprintf(stderr, "\n--mss=<n> or -m <n>\tUse TCP MSS <n>.  Default is %u\n",
-           DEFAULT_MSS);
-   fprintf(stderr, "\t\t\tA non-zero MSS adds the MSS TCP option to the SYN packet\n");
-   fprintf(stderr, "\t\t\twhich adds 4 bytes to the packet length.  If the MSS\n");
-   fprintf(stderr, "\t\t\tis specified as zero, then no MSS option is added.\n");
-   fprintf(stderr, "\n--wscale or -W\t\tAdd the WSCALE TCP option\n");
-   fprintf(stderr, "\t\t\tThis option adds 4 bytes to the packet length.\n");
-   fprintf(stderr, "\n--sack or -a\t\tAdd the SACKOK TCP option\n");
-   fprintf(stderr, "\t\t\tThis option adds 4 bytes to the packet length. However\n");
-   fprintf(stderr, "\t\t\tit does not increase packet size when used with the\n");
-   fprintf(stderr, "\t\t\t--timestamp option.\n");
-   fprintf(stderr, "\n--timestamp or -T\tAdd the TIMESTAMP TCP option\n");
-   fprintf(stderr, "\t\t\tThe number of seconds since midnight 1/1/1970 is used\n");
-   fprintf(stderr, "\t\t\tfor the timestamp value.\n");
-   fprintf(stderr, "\t\t\tThis option adds 12 bytes to the packet length.\n");
-   fprintf(stderr, "\n--snap=<s> or -n <s>\tSet the pcap snap length to <s>. Default=%d.\n", SNAPLEN);
-   fprintf(stderr, "\t\t\tThis specifies the frame capture length.  This\n");
-   fprintf(stderr, "\t\t\tlength includes the data-link header as well as the\n");
-   fprintf(stderr, "\t\t\tIP and transport headers.  The default is normally\n");
-   fprintf(stderr, "\t\t\tsufficient.\n");
-   fprintf(stderr, "\n--ttl=<t> or -l <t>\tSet the IP TTL to <t>. Default=%d.\n", DEFAULT_TTL);
-   fprintf(stderr, "\t\t\tYou can specify a higher value if the targets are\n");
-   fprintf(stderr, "\t\t\tmany hops away, or you can specify a lower value to\n");
-   fprintf(stderr, "\t\t\tlimit the scope to the local network.\n");
-   fprintf(stderr, "\n--interface=<i> or -I <u> Use network interface <i>.\n");
-   fprintf(stderr, "\t\t\tIf this option is not specified, the default is the\n");
-   fprintf(stderr, "\t\t\tvalue of the RMIF environment variable.  If RMIF is\n");
-   fprintf(stderr, "\t\t\tnot defined, then \"eth0\" is used as a last resort.\n");
-   fprintf(stderr, "\n--quiet or -q\t\tDon't decode the received packet.\n");
-   fprintf(stderr, "\t\t\tIf this option is specified, then only the minimum\n");
-   fprintf(stderr, "\t\t\tinformation is displayed.  This can be useful if you\n");
-   fprintf(stderr, "\t\t\tonly want to know if a port is open or not, or if\n");
-   fprintf(stderr, "\t\t\tstrange packets confuse the decoding process\n");
-   fprintf(stderr, "\n--ignoredups or -g\tDon't display duplicate packets.\n");
-   fprintf(stderr, "\t\t\tBy default, duplicate packets are displayed and flagged\n");
-   fprintf(stderr, "\t\t\twith \"(DUP: n)\" where n is the number of packets\n");
-   fprintf(stderr, "\t\t\treceived from that host so far.\n");
-   fprintf(stderr, "\n--df=<n> or -F <n>\tEnable (1) or disable (0) DF flag. Default=%d\n", DEFAULT_DF);
-   fprintf(stderr, "\t\t\tSetting this option to 1 sets the DF flag in the IP\n");
-   fprintf(stderr, "\t\t\theader of the outbound SYN packets.  Setting it to 0\n");
-   fprintf(stderr, "\t\t\tclears the DF flag.\n");
-   fprintf(stderr, "\n--tos=<n> or -O <n>\tSet IP TOS (Type of Service) to <n>. Default=%d\n", DEFAULT_TOS);
-   fprintf(stderr, "\t\t\tThis sets the TOS value in the IP header for outbound\n");
-   fprintf(stderr, "\t\t\tpackets.\n");
-   fprintf(stderr, "\n--portname or -P\tDisplay port names as well as numbers.\n");
-   fprintf(stderr, "\n--flags=<f> or -L <f>\tSpecify TCP flags to be set in outgoing packets.\n");
-   fprintf(stderr, "\t\t\tThe flags should be specified as a comma-separated list\n");
-   fprintf(stderr, "\t\t\tfrom the set of: CWR,ECN,URG,ACK,PSH,RST,SYN,FIN.\n");
-   fprintf(stderr, "\t\t\tIf this option is not specified, the flags default\n");
-   fprintf(stderr, "\t\t\tto SYN.\n");
+   if (detailed) {
+      fprintf(stderr, "In the options below a letter or word in angle brackets like <f> denotes a\n");
+      fprintf(stderr, "value or string that must be supplied. The corresponding text should\n");
+      fprintf(stderr, "explain the meaning of this value or string. When supplying the value or\n");
+      fprintf(stderr, "string, do not include the angle brackets. Text in square brackets like [<f>]\n");
+      fprintf(stderr, "mean that the enclosed text is optional.\n");
+      fprintf(stderr, "\n");
+      fprintf(stderr, "Options:\n");
+      fprintf(stderr, "\n");
+      fprintf(stderr, "--help or -h\t\tDisplay this usage message and exit.\n");
+      fprintf(stderr, "\n--file=<fn> or -f <fn>\tRead hostnames or addresses from the specified file\n");
+      fprintf(stderr, "\t\t\tinstead of from the command line. One name or IP\n");
+      fprintf(stderr, "\t\t\taddress per line.  Use \"-\" for standard input.\n");
+      fprintf(stderr, "\n--retry=<n> or -r <n>\tSet total number of attempts per host to <n>,\n");
+      fprintf(stderr, "\t\t\tdefault=%d.\n", retry);
+      fprintf(stderr, "\n--timeout=<n> or -t <n>\tSet initial per host timeout to <n> ms, default=%d.\n", timeout);
+      fprintf(stderr, "\t\t\tThis timeout is for the first packet sent to each host.\n");
+      fprintf(stderr, "\t\t\tsubsequent timeouts are multiplied by the backoff\n");
+      fprintf(stderr, "\t\t\tfactor which is set with --backoff.\n");
+      fprintf(stderr, "\n--interval=<n> or -i <n> Set minimum packet interval to <n> ms, default=%d.\n", interval/1000);
+      fprintf(stderr, "\t\t\tThis controls the outgoing bandwidth usage by limiting\n");
+      fprintf(stderr, "\t\t\tthe rate at which packets can be sent.  The packet\n");
+      fprintf(stderr, "\t\t\tinterval will be no smaller than this number.\n");
+      fprintf(stderr, "\t\t\tThe interval specified is in milliseconds by default.\n");
+      fprintf(stderr, "\t\t\tif \"u\" is appended to the value, then the interval\n");
+      fprintf(stderr, "\t\t\tis in microseconds, and if \"s\" is appended, the\n");
+      fprintf(stderr, "\t\t\tinterval is in seconds.\n");
+      fprintf(stderr, "\t\t\tIf you want to use up to a given bandwidth, then it is\n");
+      fprintf(stderr, "\t\t\teasier to use the --bandwidth option instead.\n");
+      fprintf(stderr, "\n--bandwidth=<n> or -B <n> Set desired outbound bandwidth to <n>.\n");
+      fprintf(stderr, "\t\t\tThe value is in bits per second by default.  If you\n");
+      fprintf(stderr, "\t\t\tappend \"K\" to the value, then the units are kilobits\n");
+      fprintf(stderr, "\t\t\tper sec; and if you append \"M\" to the value, the\n");
+      fprintf(stderr, "\t\t\tunits are megabits per second.\n");
+      fprintf(stderr, "\t\t\tThe \"K\" and \"M\" suffixes represent the decimal, not\n");
+      fprintf(stderr, "\t\t\tbinary, multiples.  So 64K is 64000, not 65536.\n");
+      fprintf(stderr, "\t\t\tYou cannot specify both --interval and --bandwidth\n");
+      fprintf(stderr, "\t\t\tbecause they are just different ways to change the\n");
+      fprintf(stderr, "\t\t\tsame parameter.\n");
+      fprintf(stderr, "\n--backoff=<b> or -b <b>\tSet timeout backoff factor to <b>, default=%.2f.\n", backoff_factor);
+      fprintf(stderr, "\t\t\tThe per-host timeout is multiplied by this factor\n");
+      fprintf(stderr, "\t\t\tafter each timeout.  So, if the number of retrys\n");
+      fprintf(stderr, "\t\t\tis 3, the initial per-host timeout is 500ms and the\n");
+      fprintf(stderr, "\t\t\tbackoff factor is 1.5, then the first timeout will be\n");
+      fprintf(stderr, "\t\t\t500ms, the second 750ms and the third 1125ms.\n");
+      fprintf(stderr, "\n--verbose or -v\t\tDisplay verbose progress messages.\n");
+      fprintf(stderr, "\t\t\tUse more than once for greater effect:\n");
+      fprintf(stderr, "\t\t\t1 - Show when hosts are removed from the list and\n");
+      fprintf(stderr, "\t\t\t    when packets with invalid cookies are received.\n");
+      fprintf(stderr, "\t\t\t2 - Show each packet sent and received.\n");
+      fprintf(stderr, "\t\t\t3 - Display the host list before\n");
+      fprintf(stderr, "\t\t\t    scanning starts.\n");
+      fprintf(stderr, "\n--version or -V\t\tDisplay program version and exit.\n");
+      fprintf(stderr, "\n--random or -R\t\tRandomise the host list.\n");
+      fprintf(stderr, "\n--numeric or -N\t\tIP addresses only, no hostnames.\n");
+      fprintf(stderr, "\t\t\tWith this option, all hosts must be specified as\n");
+      fprintf(stderr, "\t\t\tIP addresses.  Hostnames are not permitted.\n");
+   /*   fprintf(stderr, "\n--ipv6 or -6\t\tUse IPv6 protocol. Default is IPv4.\n"); */
+   /* scanner-specific help */
+      fprintf(stderr, "\n--port=<p> or -p <p>\tSpecify TCP destination port(s).\n");
+      fprintf(stderr, "\t\t\tThis option can be a single port, a list of ports\n");
+      fprintf(stderr, "\t\t\tseparated by commas, or an inclusive range with the\n");
+      fprintf(stderr, "\t\t\tbounds separated by \"-\".\n");
+      fprintf(stderr, "\n--sport=<p> or -s <p>\tSpecify TCP source port.\n");
+      fprintf(stderr, "\t\t\tThe default is a random port in the range 32678-65535.\n");
+      fprintf(stderr, "\n--seq=<s> or -e <s>\tSpecify initial sequence number.\n");
+      fprintf(stderr, "\t\t\tThe default initial sequence number is random.\n");
+      fprintf(stderr, "\n--ack=<a> or -c <a>\tSpecify initial acknowledgement number.\n");
+      fprintf(stderr, "\t\t\tThe default initial acknowledgement number is random.\n");
+      fprintf(stderr, "\t\t\tThis is only applicable when the ACK flag is set in\n");
+      fprintf(stderr, "\t\t\toutgoing packets.\n");
+      fprintf(stderr, "\n--window=<w> or -w <w>\tSpecify the TCP window size.\n");
+      fprintf(stderr, "\t\t\tThe default window size is %u.\n", DEFAULT_WINDOW);
+      fprintf(stderr, "\n--openonly or -o\tOnly display open ports.\n");
+      fprintf(stderr, "\t\t\tWith this option, closed ports are not displayed.\n");
+      fprintf(stderr, "\n--servicefile=<s> or -S <s> Use service file <s> for TCP ports.\n");
+      fprintf(stderr, "\t\t\tIf this option is specified, then the TCP ports to\n");
+      fprintf(stderr, "\t\t\tscan are read from the specified file.  The file is\n");
+      fprintf(stderr, "\t\t\tsame format as used by \"strobe\".\n");
+      fprintf(stderr, "\n--mss=<n> or -m <n>\tUse TCP MSS <n>.  Default is %u\n",
+              DEFAULT_MSS);
+      fprintf(stderr, "\t\t\tA non-zero MSS adds the MSS TCP option to the SYN packet\n");
+      fprintf(stderr, "\t\t\twhich adds 4 bytes to the packet length.  If the MSS\n");
+      fprintf(stderr, "\t\t\tis specified as zero, then no MSS option is added.\n");
+      fprintf(stderr, "\n--wscale or -W\t\tAdd the WSCALE TCP option\n");
+      fprintf(stderr, "\t\t\tThis option adds 4 bytes to the packet length.\n");
+      fprintf(stderr, "\n--sack or -a\t\tAdd the SACKOK TCP option\n");
+      fprintf(stderr, "\t\t\tThis option adds 4 bytes to the packet length. However\n");
+      fprintf(stderr, "\t\t\tit does not increase packet size when used with the\n");
+      fprintf(stderr, "\t\t\t--timestamp option.\n");
+      fprintf(stderr, "\n--timestamp or -T\tAdd the TIMESTAMP TCP option\n");
+      fprintf(stderr, "\t\t\tThe number of seconds since midnight 1/1/1970 is used\n");
+      fprintf(stderr, "\t\t\tfor the timestamp value.\n");
+      fprintf(stderr, "\t\t\tThis option adds 12 bytes to the packet length.\n");
+      fprintf(stderr, "\n--snap=<s> or -n <s>\tSet the pcap snap length to <s>. Default=%d.\n", SNAPLEN);
+      fprintf(stderr, "\t\t\tThis specifies the frame capture length.  This\n");
+      fprintf(stderr, "\t\t\tlength includes the data-link header as well as the\n");
+      fprintf(stderr, "\t\t\tIP and transport headers.  The default is normally\n");
+      fprintf(stderr, "\t\t\tsufficient.\n");
+      fprintf(stderr, "\n--ttl=<t> or -l <t>\tSet the IP TTL to <t>. Default=%d.\n", DEFAULT_TTL);
+      fprintf(stderr, "\t\t\tYou can specify a higher value if the targets are\n");
+      fprintf(stderr, "\t\t\tmany hops away, or you can specify a lower value to\n");
+      fprintf(stderr, "\t\t\tlimit the scope to the local network.\n");
+      fprintf(stderr, "\n--interface=<i> or -I <u> Use network interface <i>.\n");
+      fprintf(stderr, "\t\t\tIf this option is not specified, the default is the\n");
+      fprintf(stderr, "\t\t\tvalue of the RMIF environment variable.  If RMIF is\n");
+      fprintf(stderr, "\t\t\tnot defined, then \"eth0\" is used as a last resort.\n");
+      fprintf(stderr, "\n--quiet or -q\t\tDon't decode the received packet.\n");
+      fprintf(stderr, "\t\t\tIf this option is specified, then only the minimum\n");
+      fprintf(stderr, "\t\t\tinformation is displayed.  This can be useful if you\n");
+      fprintf(stderr, "\t\t\tonly want to know if a port is open or not, or if\n");
+      fprintf(stderr, "\t\t\tstrange packets confuse the decoding process\n");
+      fprintf(stderr, "\n--ignoredups or -g\tDon't display duplicate packets.\n");
+      fprintf(stderr, "\t\t\tBy default, duplicate packets are displayed and flagged\n");
+      fprintf(stderr, "\t\t\twith \"(DUP: n)\" where n is the number of packets\n");
+      fprintf(stderr, "\t\t\treceived from that host so far.\n");
+      fprintf(stderr, "\n--df=<n> or -F <n>\tEnable (1) or disable (0) DF flag. Default=%d\n", DEFAULT_DF);
+      fprintf(stderr, "\t\t\tSetting this option to 1 sets the DF flag in the IP\n");
+      fprintf(stderr, "\t\t\theader of the outbound SYN packets.  Setting it to 0\n");
+      fprintf(stderr, "\t\t\tclears the DF flag.\n");
+      fprintf(stderr, "\n--tos=<n> or -O <n>\tSet IP TOS (Type of Service) to <n>. Default=%d\n", DEFAULT_TOS);
+      fprintf(stderr, "\t\t\tThis sets the TOS value in the IP header for outbound\n");
+      fprintf(stderr, "\t\t\tpackets.\n");
+      fprintf(stderr, "\n--portname or -P\tDisplay port names as well as numbers.\n");
+      fprintf(stderr, "\n--servicefile2=<f> or -E <f>\tUse TCP service filename <f>.\n");
+      fprintf(stderr, "\t\t\tThe service file is used when displaying TCP port names.\n");
+      fprintf(stderr, "\t\t\tIt is in the standard \"/etc/services\" file format.\n");
+      fprintf(stderr, "\t\t\tBy default, the services file supplied with tcp-scan is\n");
+      fprintf(stderr, "\t\t\tused.\n");
+      fprintf(stderr, "\n--flags=<f> or -L <f>\tSpecify TCP flags to be set in outgoing packets.\n");
+      fprintf(stderr, "\t\t\tThe flags should be specified as a comma-separated list\n");
+      fprintf(stderr, "\t\t\tfrom the set of: CWR,ECN,URG,ACK,PSH,RST,SYN,FIN.\n");
+      fprintf(stderr, "\t\t\tIf this option is not specified, the flags default\n");
+      fprintf(stderr, "\t\t\tto SYN.\n");
+   } else {
+      fprintf(stderr, "use \"tcp-scan --help\" for detailed information on the available options.\n");
+   }
    fprintf(stderr, "\n");
    fprintf(stderr, "Report bugs or send suggestions to %s\n", PACKAGE_BUGREPORT);
    exit(status);
@@ -1568,14 +1597,18 @@ uint32_t get_source_ip(char *devname) {
 
 /* Create UDP socket */
    if ((sockfd=socket(PF_INET, SOCK_DGRAM, 0)) < 0) {
-      perror("socket");
-      exit(1);
+      err_sys("socket");
    }
 /* Obtain IP address for specified interface */
    if ((ioctl(sockfd, SIOCGIFADDR, &ifconfig)) != 0) {
-      perror("ioctl");
-      exit(1);
+      if (errno == EADDRNOTAVAIL) {
+         err_sys("Cannot obtain IP address for interface %s", devname);
+      } else {
+         err_sys("ioctl");
+      }
    }
+/* Close the socket */
+   close(sockfd);
 
    memcpy(&sa, &ifconfig.ifr_ifru.ifru_addr, sizeof(sa));
    return sa.sin_addr.s_addr;
@@ -1754,7 +1787,8 @@ process_options(int argc, char *argv[]) {
       {"verbose", no_argument, 0, 'v'},
       {"version", no_argument, 0, 'V'},
       {"debug", no_argument, 0, 'd'},
-      {"data", required_argument, 0, 'D'},
+      {"data", required_argument, 0, 'D'},	/* depreciated */
+      {"port", required_argument, 0, 'p'},
       {"sport", required_argument, 0, 's'},
       {"seq", required_argument, 0, 'e'},
       {"window", required_argument, 0, 'w'},
@@ -1778,10 +1812,11 @@ process_options(int argc, char *argv[]) {
       {"ipv6", no_argument, 0, '6'},
       {"bandwidth", required_argument, 0, 'B'},
       {"ack", required_argument, 0, 'c'},
+      {"servicefile2", required_argument, 0, 'E'},
       {0, 0, 0, 0}
    };
    const char *short_options =
-      "f:hr:t:i:b:vVdD:s:e:w:oS:m:WaTn:l:I:qgF:O:RNPL:6B:c:";
+      "f:hr:t:i:b:vVdD:p:s:e:w:oS:m:WaTn:l:I:qgF:O:RNPL:6B:c:E:";
    int arg;
    int options_index=0;
 
@@ -1799,7 +1834,7 @@ process_options(int argc, char *argv[]) {
             filename_flag=1;
             break;
          case 'h':	/* --help */
-            usage(EXIT_SUCCESS);
+            usage(EXIT_SUCCESS, 1);
             break;
          case 'r':	/* --retry */
             retry=Strtoul(optarg, 10);
@@ -1831,7 +1866,8 @@ process_options(int argc, char *argv[]) {
          case 'd':	/* --debug */
             debug++;
             break;
-         case 'D':	/* --data */
+         case 'D':	/* --data (depreciated) */
+         case 'p':	/* --port */
             local_data = Malloc(strlen(optarg)+1);
             p1 = optarg;
             p2 = local_data;
@@ -1930,8 +1966,11 @@ process_options(int argc, char *argv[]) {
             ack_no=Strtoul(optarg, 0);
             ack_no_flag=1;
             break;
+         case 'E':	/* --servicefile2 */
+            strlcpy(service_file, optarg, sizeof(service_file));
+            break;
          default:	/* Unknown option */
-            usage(EXIT_FAILURE);
+            usage(EXIT_FAILURE, 0);
             break;
       }
    }

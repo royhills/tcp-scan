@@ -2,8 +2,6 @@ $Id$
 
 Don't display closed ports by default [need to check engine usage].
 
-Change --data (-D) option to something more sensible [need to check engine usage].
-
 Display port names by default [need to check engine usage].
 
 Review default bandwidth, and possibly increase it.
@@ -16,8 +14,11 @@ Add IPv6 support
 
 Complete manpage tcp-scan.1
 
-Add option to use different services file.
-
 Remove references to RMIF environment variable.
 
-Only display brief help message for usage errors.
+Remove deprecated --data (-D) option after modifying engine.
+
+Add details about tcp-scan homepage and wiki to help output.
+
+Rename "servicefile" option to "portfile" and "servicefile2"
+to "servicefile" [need to check engine usage].
