@@ -14,8 +14,6 @@ Add IPv6 support
 
 Complete manpage tcp-scan.1
 
-Remove references to RMIF environment variable.
-
 Remove deprecated --data (-D) option after modifying engine.
 
 Add details about tcp-scan homepage and wiki to help output.

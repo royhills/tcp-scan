@@ -969,14 +969,14 @@ initialise(void) {
       source_port |= 0x8000;
    }
 /*
- *	Determine source interface and associated IP address.
- *	If the interface was specified with the --interface option then use
- *	that, otherwise if the environment variable "RMIF" exists then use
- *	that, failing that default to "eth0".
+ *      Determine network interface to use and associated IP address.
+ *      If the interface was specified with the --interface option then use
+ *      that, otherwise use pcap_lookupdev() to pick a suitable interface.
  */
-   if (!if_name) {
-      if (!(if_name=getenv("RMIF")))
-         if_name="eth0";
+   if (!if_name) { /* i/f not specified with --interface */
+      if (!(if_name=pcap_lookupdev(errbuf))) {
+         err_msg("pcap_lookupdev: %s", errbuf);
+      }
    }
    source_address = get_source_ip(if_name);
 /*
@@ -1287,9 +1287,9 @@ usage(int status, int detailed) {
       fprintf(stderr, "\t\t\tmany hops away, or you can specify a lower value to\n");
       fprintf(stderr, "\t\t\tlimit the scope to the local network.\n");
       fprintf(stderr, "\n--interface=<i> or -I <u> Use network interface <i>.\n");
-      fprintf(stderr, "\t\t\tIf this option is not specified, the default is the\n");
-      fprintf(stderr, "\t\t\tvalue of the RMIF environment variable.  If RMIF is\n");
-      fprintf(stderr, "\t\t\tnot defined, then \"eth0\" is used as a last resort.\n");
+      fprintf(stderr, "\t\t\tIf this option is not specified, tcp-scan will search\n");
+      fprintf(stderr, "\t\t\tthe system interface list for the lowest numbered,\n");
+      fprintf(stderr, "\t\t\tconfigured up interface (excluding loopback).\n");
       fprintf(stderr, "\n--quiet or -q\t\tDon't decode the received packet.\n");
       fprintf(stderr, "\t\t\tIf this option is specified, then only the minimum\n");
       fprintf(stderr, "\t\t\tinformation is displayed.  This can be useful if you\n");
