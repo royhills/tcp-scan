@@ -1,5 +1,10 @@
 $Id$
 
+2008-10-24 Roy Hills <Roy.Hills@nta-monitor.com>
+
+	* configure.ac: incremented version number to 1.16.
+	  First beta test version for DK, DC & AP.
+
 2008-07-11 Roy Hills <Roy.Hills@nta-monitor.com>
 
 	* tcp-scan.c: Removed reference to RMIF environment variable.

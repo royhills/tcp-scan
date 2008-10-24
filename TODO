@@ -1,10 +1,10 @@
 $Id$
 
-Don't display closed ports by default [need to check engine usage].
+Don't display closed ports by default [need to check NTA engine usage].
 
-Display port names by default [need to check engine usage].
+Display port names by default [need to check NTA engine usage].
 
-Review default bandwidth, and possibly increase it.
+Review default bandwidth and possibly increase it.
 
 Add better "make check" tests and measure code coverage.
 
@@ -14,9 +14,9 @@ Add IPv6 support
 
 Complete manpage tcp-scan.1
 
-Remove deprecated --data (-D) option after modifying engine.
+Remove deprecated --data (-D) option after modifying NTA engine.
 
 Add details about tcp-scan homepage and wiki to help output.
 
 Rename "servicefile" option to "portfile" and "servicefile2"
-to "servicefile" [need to check engine usage].
+to "servicefile" [need to check NTA engine usage].
