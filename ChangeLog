@@ -1,9 +1,20 @@
 $Id$
 
+2008-10-25 Roy Hills <Roy.Hills@nta-monitor.com>
+
+	* tcp-scan.c: Added new --pcapsavefile (-C) option to allow
+	  received TCP packets to be saved to a pcap file for later
+	  analysis.
+
+	* configure.ac: Improved checks for pcap library.
+
 2008-10-24 Roy Hills <Roy.Hills@nta-monitor.com>
 
 	* configure.ac: incremented version number to 1.16.
 	  First beta test version for DK, DC & AP.
+
+	* tarball: tcp-scan-1.16.tar.gz
+	  Size: 167,451 MD5: 9fa6ea49e2648cba49a94a61ccadcfbe
 
 2008-07-11 Roy Hills <Roy.Hills@nta-monitor.com>
 

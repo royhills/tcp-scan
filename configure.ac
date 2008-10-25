@@ -1,7 +1,7 @@
 dnl $Id$
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT([tcp-scan], [1.16], [tcp-scan@nta-monitor.com])
+AC_INIT([tcp-scan], [1.17], [tcp-scan@nta-monitor.com])
 AC_PREREQ(2.59)
 AC_REVISION($Revision$)
 AC_CONFIG_SRCDIR([tcp-scan.c])
@@ -24,7 +24,28 @@ dnl Solaris 8 needs nsl and socket.  Linux and {Free,Open}BSD do not.
 dnl Just about everything will need pcap.
 AC_SEARCH_LIBS([gethostbyname], [nsl])
 AC_SEARCH_LIBS([socket], [socket])
-AC_SEARCH_LIBS([pcap_open_live], [pcap])
+AC_SEARCH_LIBS([pcap_open_live], [pcap], ,
+   [
+   AC_MSG_NOTICE([Cannot find pcap library containing pcap_open_live])
+   AC_MSG_ERROR([Check that you have libpcap version 0.8 or later installed])
+   ])
+
+dnl Check that the pcap library contains pcap_lib_version
+dnl This was introduced in version 0.8, and our application requires it.
+dnl
+dnl We perform this check as a seperate step, rather than just checking for
+dnl pcap_lib_version in the earlier AC_SEARCH_LIBS call, because it
+dnl allows us to provide different error messages for missing pcap and non
+dnl functional pcap and so avoids confusing generic error messages.
+dnl
+AC_MSG_CHECKING([for a compatible pcap library])
+AC_LINK_IFELSE([AC_LANG_CALL([], [pcap_lib_version])],
+   [AC_MSG_RESULT([yes])],
+   [
+   AC_MSG_RESULT([no])
+   AC_MSG_NOTICE([Cannot find pcap_lib_version in pcap library])
+   AC_MSG_ERROR([Check that the pcap library is at least version 0.8])
+   ])
 
 dnl Checks for header files.
 AC_HEADER_STDC

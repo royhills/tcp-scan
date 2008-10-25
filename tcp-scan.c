@@ -68,12 +68,12 @@ unsigned live_count;			/* Number of entries awaiting reply */
 char service_file[MAXLINE];		/* TCP Service file name */
 int verbose = 0;			/* Verbose level */
 int debug = 0;				/* Debug flag */
-char *local_data=NULL;			/* Local data from --data option */
+char *local_data=NULL;			/* Local data from --port option */
 host_entry *helist = NULL;		/* Array of host entries */
 host_entry **helistptr;			/* Array of pointers to host entries */
 unsigned num_hosts = 0;			/* Number of entries in the list */
 unsigned max_iter;			/* Max iterations in find_host() */
-pcap_t *handle;				/* pcap handle */
+pcap_t *pcap_handle;			/* pcap handle */
 host_entry **cursor;			/* Pointer to current host entry ptr */
 unsigned responders = 0;		/* Number of hosts which responded */
 char filename[MAXLINE];
@@ -89,6 +89,8 @@ int pcap_fd;				/* pcap File Descriptor */
 static size_t ip_offset;		/* Offset to IP header in pcap pkt */
 static uint16_t *port_list=NULL;
 static char *ga_err_msg;		/* getaddrinfo error message */
+static char pcap_savefile[MAXLINE];	/* pcap savefile filename */
+static pcap_dumper_t *pcap_dump_handle = NULL;  /* pcap savefile handle */
 
 int
 main(int argc, char *argv[]) {
@@ -116,6 +118,7 @@ main(int argc, char *argv[]) {
  *	Initialise file names to the empty string.
  */
    service_file[0] = '\0';
+   pcap_savefile[0] = '\0';
 /*
  *      Process options.
  */
@@ -982,10 +985,10 @@ initialise(void) {
 /*
  *	Prepare pcap
  */
-   if (!(handle = pcap_open_live(if_name, snaplen, PROMISC, TO_MS, errbuf)))
+   if (!(pcap_handle=pcap_open_live(if_name, snaplen, PROMISC, TO_MS, errbuf)))
       err_msg("pcap_open_live: %s\n", errbuf);
-   if ((datalink=pcap_datalink(handle)) < 0)
-      err_msg("pcap_datalink: %s\n", pcap_geterr(handle));
+   if ((datalink=pcap_datalink(pcap_handle)) < 0)
+      err_msg("pcap_datalink: %s\n", pcap_geterr(pcap_handle));
    printf("Interface: %s, datalink type: %s (%s)\n", if_name,
           pcap_datalink_val_to_name(datalink),
           pcap_datalink_val_to_description(datalink));
@@ -1000,9 +1003,9 @@ initialise(void) {
          err_msg("Unsupported datalink type");
          break;
    }
-   if ((pcap_fd=pcap_fileno(handle)) < 0)
-      err_msg("pcap_fileno: %s\n", pcap_geterr(handle));
-   if ((pcap_setnonblock(handle, 1, errbuf)) < 0)
+   if ((pcap_fd=pcap_fileno(pcap_handle)) < 0)
+      err_msg("pcap_fileno: %s\n", pcap_geterr(pcap_handle));
+   if ((pcap_setnonblock(pcap_handle, 1, errbuf)) < 0)
       err_msg("pcap_setnonblock: %s\n", errbuf);
    if (pcap_lookupnet(if_name, &localnet, &netmask, errbuf) < 0)
       err_msg("pcap_lookupnet: %s\n", errbuf);
@@ -1013,11 +1016,19 @@ initialise(void) {
       filter_string=make_message("tcp dst port %u and tcp[8:4] = %u",
                                  source_port, seq_no+1);
    }
-   if ((pcap_compile(handle, &filter, filter_string, OPTIMISE, netmask)) < 0)
-      err_msg("pcap_geterr: %s\n", pcap_geterr(handle));
+   if ((pcap_compile(pcap_handle, &filter, filter_string, OPTIMISE, netmask)) < 0)
+      err_msg("pcap_geterr: %s\n", pcap_geterr(pcap_handle));
    free(filter_string);
-   if ((pcap_setfilter(handle, &filter)) < 0)
-      err_msg("pcap_setfilter: %s\n", pcap_geterr(handle));
+   if ((pcap_setfilter(pcap_handle, &filter)) < 0)
+      err_msg("pcap_setfilter: %s\n", pcap_geterr(pcap_handle));
+/*
+ *      Open pcap savefile is the --pcapsavefile (-C) option was specified
+ */
+   if (*pcap_savefile != '\0') {
+      if (!(pcap_dump_handle=pcap_dump_open(pcap_handle, pcap_savefile))) {
+         err_msg("pcap_dump_open: %s", pcap_geterr(pcap_handle));
+      }
+   }
 /*
  *	If we are displaying portnames, then initialise portname array.
  */
@@ -1154,12 +1165,14 @@ void
 clean_up(void) {
    struct pcap_stat stats;
 
-   if ((pcap_stats(handle, &stats)) < 0)
-      err_msg("pcap_stats: %s\n", pcap_geterr(handle));
+   if ((pcap_stats(pcap_handle, &stats)) < 0)
+      err_msg("pcap_stats: %s\n", pcap_geterr(pcap_handle));
 
    printf("%u packets received by filter, %u packets dropped by kernel\n",
           stats.ps_recv, stats.ps_drop);
-   pcap_close(handle);
+   if (pcap_dump_handle)
+      pcap_dump_close(pcap_dump_handle);
+   pcap_close(pcap_handle);
 }
 
 /*
@@ -1317,6 +1330,11 @@ usage(int status, int detailed) {
       fprintf(stderr, "\t\t\tfrom the set of: CWR,ECN,URG,ACK,PSH,RST,SYN,FIN.\n");
       fprintf(stderr, "\t\t\tIf this option is not specified, the flags default\n");
       fprintf(stderr, "\t\t\tto SYN.\n");
+      fprintf(stderr, "\n--pcapsavefile=<p> or -C <p>\tWrite received packets to pcap savefile <p>.\n");
+      fprintf(stderr, "\t\t\tThis option causes received TCP packets to be written\n");
+      fprintf(stderr, "\t\t\tto a pcap savefile with the specified name.  This\n");
+      fprintf(stderr, "\t\t\tsavefile can be analyzed with programs that understand\n");
+      fprintf(stderr, "\t\t\tthe pcap file format, such as \"tcpdump\" and \"wireshark\".\n");
    } else {
       fprintf(stderr, "use \"tcp-scan --help\" for detailed information on the available options.\n");
    }
@@ -1347,16 +1365,16 @@ add_host(char *name, unsigned timeout) {
 
    if (first_time_through) {
       if (local_data == NULL && port_list == NULL) {
-         warn_msg("You must specify the TCP dest ports with either the --data option");
+         warn_msg("You must specify the TCP dest ports with either the --port option");
          err_msg("or with the --servicefile option.");
       }
 
       if (local_data && port_list) {
-         err_msg("You cannot specify both the --data and --servicefile options.");
+         err_msg("You cannot specify both the --port and --servicefile options.");
       }
       first_time_through=0;
    }
-   if (local_data) {	/* --data option specified */
+   if (local_data) {	/* --port option specified */
 /*
  *	Determine the ports in the port spec, and add a host entry for
  *	each one.
@@ -1473,8 +1491,8 @@ recvfrom_wto(int s, unsigned char *buf, int len, struct sockaddr *saddr,
    } else if (n == 0) {
       return;	/* Timeout */
    }
-   if ((pcap_dispatch(handle, -1, callback, NULL)) < 0)
-      err_sys("pcap_dispatch: %s\n", pcap_geterr(handle));
+   if ((pcap_dispatch(pcap_handle, -1, callback, NULL)) < 0)
+      err_sys("pcap_dispatch: %s\n", pcap_geterr(pcap_handle));
 }
 
 /*
@@ -1747,6 +1765,9 @@ callback(u_char *args, const struct pcap_pkthdr *header,
       temp_cursor->num_recv++;
       if ((!open_only || (tcph->syn && tcph->ack)) &&
           (temp_cursor->live || !ignore_dups)) {
+         if (pcap_dump_handle) {
+            pcap_dump((unsigned char *)pcap_dump_handle, header, packet_in);
+         }
          display_packet(n, packet_in, temp_cursor, &source_ip);
          responders++;
       }
@@ -1813,10 +1834,11 @@ process_options(int argc, char *argv[]) {
       {"bandwidth", required_argument, 0, 'B'},
       {"ack", required_argument, 0, 'c'},
       {"servicefile2", required_argument, 0, 'E'},
+      {"pcapsavefile", required_argument, 0, 'C'},
       {0, 0, 0, 0}
    };
    const char *short_options =
-      "f:hr:t:i:b:vVdD:p:s:e:w:oS:m:WaTn:l:I:qgF:O:RNPL:6B:c:E:";
+      "f:hr:t:i:b:vVdD:p:s:e:w:oS:m:WaTn:l:I:qgF:O:RNPL:6B:c:E:C:";
    int arg;
    int options_index=0;
 
@@ -1968,6 +1990,9 @@ process_options(int argc, char *argv[]) {
             break;
          case 'E':	/* --servicefile2 */
             strlcpy(service_file, optarg, sizeof(service_file));
+            break;
+         case 'C':	/* --pcapsavefile */
+            strlcpy(pcap_savefile, optarg, sizeof(pcap_savefile));
             break;
          default:	/* Unknown option */
             usage(EXIT_FAILURE, 0);
