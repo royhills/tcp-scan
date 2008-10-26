@@ -100,8 +100,8 @@ main(int argc, char *argv[]) {
    unsigned char packet_in[MAXIP];      /* Received packet */
    struct timeval diff;         /* Difference between two timevals */
    unsigned select_timeout;     /* Select timeout */
-   unsigned long long loop_timediff;    /* Time since last packet sent in us */
-   unsigned long long host_timediff; /* Time since last pkt sent to this host (us) */
+   TCP_UINT64 loop_timediff;    /* Time since last packet sent in us */
+   TCP_UINT64 host_timediff; /* Time since last pkt sent to this host (us) */
    struct timeval last_packet_time;     /* Time last packet was sent */
    int req_interval;            /* Requested per-packet interval */
    int cum_err=0;               /* Cumulative timing error */
@@ -238,7 +238,7 @@ main(int argc, char *argv[]) {
       if (packet_out_len < MINIMUM_FRAME_SIZE)
          packet_out_len = MINIMUM_FRAME_SIZE;   /* Adjust to minimum size */
       packet_out_len += PACKET_OVERHEAD;        /* Add layer 2 overhead */
-      interval = ((ARP_UINT64)packet_out_len * 8 * 1000000) / bandwidth;
+      interval = ((TCP_UINT64)packet_out_len * 8 * 1000000) / bandwidth;
       if (verbose) {
          warn_msg("DEBUG: Ether pkt len=%u bytes, bandwidth=%u bps, int=%u us",
                   packet_out_len, bandwidth, interval);
@@ -273,16 +273,16 @@ main(int argc, char *argv[]) {
  *      potentially send a packet to the current host.
  */
       timeval_diff(&now, &last_packet_time, &diff);
-      loop_timediff = (unsigned long long)1000000*diff.tv_sec + diff.tv_usec;
+      loop_timediff = (TCP_UINT64)1000000*diff.tv_sec + diff.tv_usec;
       if (loop_timediff >= req_interval) {
-         if (debug) {print_times(); printf("main: Can send packet now.  loop_timediff=%llu\n", loop_timediff);}
+         if (debug) {print_times(); printf("main: Can send packet now.  loop_timediff=" TCP_UINT64_FORMAT "\n", loop_timediff);}
 /*
  *      If the last packet to this host was sent more than the current
  *      timeout for this host us ago, then we can potentially send a packet
  *      to it.
  */
          timeval_diff(&now, &((*cursor)->last_send_time), &diff);
-         host_timediff = (unsigned long long)1000000*diff.tv_sec + diff.tv_usec;
+         host_timediff = (TCP_UINT64)1000000*diff.tv_sec + diff.tv_usec;
          if (host_timediff >= (*cursor)->timeout) {
             if (reset_cum_err) {
                if (debug) {print_times(); printf("main: Reset cum_err\n");}
@@ -297,7 +297,7 @@ main(int argc, char *argv[]) {
                   req_interval = 0;
                }
             }
-            if (debug) {print_times(); printf("main: Can send packet to host %d now.  host_timediff=%llu, timeout=%u, req_interval=%d, cum_err=%d\n", (*cursor)->n, host_timediff, (*cursor)->timeout, req_interval, cum_err);}
+            if (debug) {print_times(); printf("main: Can send packet to host %d now.  host_timediff=" TCP_UINT64_FORMAT ", timeout=%u, req_interval=%d, cum_err=%d\n", (*cursor)->n, host_timediff, (*cursor)->timeout, req_interval, cum_err);}
             select_timeout = req_interval;
 /*
  *      If we've exceeded our retry limit, then this host has timed out so
@@ -316,7 +316,7 @@ main(int argc, char *argv[]) {
                remove_host(cursor);     /* Automatically calls advance_cursor() */
                if (first_timeout) {
                   timeval_diff(&now, &((*cursor)->last_send_time), &diff);
-                  host_timediff = (unsigned long long)1000000*diff.tv_sec +
+                  host_timediff = (TCP_UINT64)1000000*diff.tv_sec +
                                   diff.tv_usec;
                   while (host_timediff >= (*cursor)->timeout && live_count) {
                      if ((*cursor)->live) {
@@ -327,7 +327,7 @@ main(int argc, char *argv[]) {
                         advance_cursor();
                      }
                      timeval_diff(&now, &((*cursor)->last_send_time), &diff);
-                     host_timediff = (unsigned long long)1000000*diff.tv_sec +
+                     host_timediff = (TCP_UINT64)1000000*diff.tv_sec +
                                      diff.tv_usec;
                   }
                   first_timeout=0;
@@ -346,11 +346,11 @@ main(int argc, char *argv[]) {
  */
             select_timeout = (*cursor)->timeout - host_timediff;
             reset_cum_err = 1;  /* Zero cumulative error */
-            if (debug) {print_times(); printf("main: Can't send packet to host %d yet. host_timediff=%llu\n", (*cursor)->n, host_timediff);}
+            if (debug) {print_times(); printf("main: Can't send packet to host %d yet. host_timediff=" TCP_UINT64_FORMAT "\n", (*cursor)->n, host_timediff);}
          } /* End If */
       } else {          /* We can't send a packet yet */
          select_timeout = req_interval - loop_timediff;
-         if (debug) {print_times(); printf("main: Can't send packet yet.  loop_timediff=%llu\n", loop_timediff);}
+         if (debug) {print_times(); printf("main: Can't send packet yet.  loop_timediff=" TCP_UINT64_FORMAT "\n", loop_timediff);}
       } /* End If */
 
       recvfrom_wto(pcap_fd, packet_in, MAXIP, (struct sockaddr *)&sa_peer,
@@ -1052,11 +1052,11 @@ initialise(void) {
  *	Die if any error occurs.
  */
       if ((result=regcomp(&servent_pat, servent_pat_str, REG_EXTENDED|REG_ICASE))) {
-         char errbuf[MAXLINE];
+         char reg_errbuf[MAXLINE];
          size_t errlen;
-         errlen=regerror(result, &servent_pat, errbuf, MAXLINE);
+         errlen=regerror(result, &servent_pat, reg_errbuf, MAXLINE);
          err_msg("ERROR: cannot compile regex pattern \"%s\": %s",
-                 servent_pat_str, errbuf);
+                 servent_pat_str, reg_errbuf);
       }
 /*
  *	Determine the filename for the services file, and open this file
@@ -1095,10 +1095,10 @@ initialise(void) {
          if (result == REG_NOMATCH || pmatch[1].rm_so < 0 || pmatch[2].rm_so < 0) {
             continue;
          } else if (result != 0) {
-            char errbuf[MAXLINE];
+            char reg_errbuf[MAXLINE];
             size_t errlen;
-            errlen=regerror(result, &servent_pat, errbuf, MAXLINE);
-            err_msg("ERROR: backoff pattern match regexec failed: %s", errbuf);
+            errlen=regerror(result, &servent_pat, reg_errbuf, MAXLINE);
+            err_msg("ERROR: backoff pattern match regexec failed: %s", reg_errbuf);
          }
 /*
  *	Obtain the port name and port number using the pmatch offsets

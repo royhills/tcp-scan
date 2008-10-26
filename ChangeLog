@@ -8,6 +8,8 @@ $Id$
 
 	* configure.ac: Improved checks for pcap library.
 
+	* Minor code changes to improve portability.
+
 2008-10-24 Roy Hills <Roy.Hills@nta-monitor.com>
 
 	* configure.ac: incremented version number to 1.16.

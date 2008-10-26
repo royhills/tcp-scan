@@ -20,3 +20,8 @@ Add details about tcp-scan homepage and wiki to help output.
 
 Rename "servicefile" option to "portfile" and "servicefile2"
 to "servicefile" [need to check NTA engine usage].
+
+create_port_list() uses the old strobe service file parsing code, which
+does not work with long service names, or names containing slashes.
+
+Display the default bandwidth in the --help output.

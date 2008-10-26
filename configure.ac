@@ -84,9 +84,9 @@ else
     fi
 fi
 
-AC_DEFINE_UNQUOTED(ARP_INT64, $INT64_TYPE,
+AC_DEFINE_UNQUOTED(TCP_INT64, $INT64_TYPE,
                    [Define to the appropriate type for 64-bit ints.])
-AC_DEFINE_UNQUOTED(ARP_UINT64, $UINT64_TYPE,
+AC_DEFINE_UNQUOTED(TCP_UINT64, $UINT64_TYPE,
                    [Define to the appropriate type for unsigned 64-bit ints.])
 
 dnl If we found "long int" is 64 bits, assume snprintf handles it.  If
@@ -107,10 +107,10 @@ else
   UINT64_FORMAT='"%lu"'
 fi
 
-AC_DEFINE_UNQUOTED(ARP_INT64_FORMAT, $INT64_FORMAT,
+AC_DEFINE_UNQUOTED(TCP_INT64_FORMAT, $INT64_FORMAT,
                    [Define to the appropriate snprintf format for 64-bit ints.])
 
-AC_DEFINE_UNQUOTED(ARP_UINT64_FORMAT, $UINT64_FORMAT,
+AC_DEFINE_UNQUOTED(TCP_UINT64_FORMAT, $UINT64_FORMAT,
                    [Define to the appropriate snprintf format for unsigned 64-bit ints.])
 
 dnl Checks for library functions.

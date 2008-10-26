@@ -187,7 +187,7 @@ printable(const unsigned char *string, size_t size) {
  *      Determine required size of output string.
  */
    if (!size)
-      size = strlen((char *) string);
+      size = strlen((const char *) string);
 
    outlen = size;
    cp = string;
