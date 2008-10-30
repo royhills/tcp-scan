@@ -1,5 +1,10 @@
 $Id$
 
+2008-10-30 Roy Hills <Roy.Hills@nta-monitor.com>
+
+	* check-sizes.c: New program to check the sizes of key types and
+	  structures.
+
 2008-10-25 Roy Hills <Roy.Hills@nta-monitor.com>
 
 	* tcp-scan.c: Added new --pcapsavefile (-C) option to allow
