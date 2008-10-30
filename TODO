@@ -23,5 +23,3 @@ to "servicefile" [need to check NTA engine usage].
 
 create_port_list() uses the old strobe service file parsing code, which
 does not work with long service names, or names containing slashes.
-
-Display the default bandwidth in the --help output.
