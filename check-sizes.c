@@ -37,6 +37,7 @@
 
 #define EXPECTED_IP_HDR 20
 #define EXPECTED_TCP_HDR 20
+#define EXPECTED_PSEUDO_HDR 12
 
 #define EXPECTED_UINT8_T 1
 #define EXPECTED_UINT16_T 2
@@ -66,6 +67,15 @@ main() {
    printf("tcphdr\t\t%u\t%lu\t", EXPECTED_TCP_HDR,
           (unsigned long) (octets_per_char * sizeof(struct tcphdr)));
    if (octets_per_char * sizeof(struct tcphdr) != EXPECTED_TCP_HDR) {
+      error++;
+      printf("ERROR\n");
+   } else {
+      printf("ok\n");
+   }
+
+   printf("pseudo_hdr\t%u\t%lu\t", EXPECTED_PSEUDO_HDR,
+          (unsigned long) (octets_per_char * sizeof(pseudo_hdr)));
+   if (octets_per_char * sizeof(pseudo_hdr) != EXPECTED_PSEUDO_HDR) {
       error++;
       printf("ERROR\n");
    } else {

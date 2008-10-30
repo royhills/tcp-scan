@@ -167,6 +167,15 @@ typedef struct {
    int fin;
 } tcp_flags_struct;
 
+/* TCP Pseudo Header for checksum calculation */
+typedef struct {
+   uint32_t s_addr;
+   uint32_t d_addr;
+   uint8_t  mbz;
+   uint8_t  proto;
+   uint16_t len;
+} pseudo_hdr;
+
 /* Functions */
 
 #ifndef HAVE_STRLCAT
@@ -213,7 +222,7 @@ unsigned long int Strtoul(const char *, int);
 long int Strtol(const char *, int);
 unsigned int hstr_i(const char *);
 uint16_t in_cksum(uint16_t *, int);
-uint32_t get_source_ip(char *);
+uint32_t get_source_ip(const char *);
 void add_host_port(char *, unsigned, unsigned);
 void create_port_list(char *);
 void process_tcp_flags(const char *);

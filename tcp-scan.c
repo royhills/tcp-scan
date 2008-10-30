@@ -84,7 +84,7 @@ int ipv6_flag=0;			/* IPv6 */
 unsigned bandwidth=DEFAULT_BANDWIDTH;	/* Bandwidth in bits per sec */
 unsigned interval=0;
 
-static uint32_t source_address;
+static uint32_t source_address;		/* Source IP Address */
 int pcap_fd;				/* pcap File Descriptor */
 static size_t ip_offset;		/* Offset to IP header in pcap pkt */
 static uint16_t *port_list=NULL;
@@ -391,7 +391,7 @@ main(int argc, char *argv[]) {
  *
  *      None.
  *
- *      This should check the received packet and display details of what
+ *      This checks the received packet and displays details of what
  *      was received in the format: <IP-Address><TAB><Details>.
  */
 void
@@ -734,9 +734,9 @@ display_packet(int n, const unsigned char *packet_in, host_entry *he,
  *
  *      The size of the packet that was sent.
  *
- *      This must construct an appropriate packet and send it to the host
+ *      This constructs an appropriate packet and sends it to the host
  *      identified by "he" using the socket "s".
- *      It must also update the "last_send_time" field for this host entry.
+ *      It also updates the "last_send_time" field for this host entry.
  */
 int
 send_packet(int s, host_entry *he, int ip_protocol,
@@ -747,16 +747,9 @@ send_packet(int s, host_entry *he, int ip_protocol,
    NET_SIZE_T sa_peer_len;
    struct iphdr *iph = (struct iphdr *) buf;
    struct tcphdr *tcph = (struct tcphdr *) (buf + sizeof(struct iphdr));
-   struct pseudo_hdr {	/* For computing TCP checksum */
-      uint32_t s_addr;
-      uint32_t d_addr;
-      uint8_t  mbz;
-      uint8_t  proto;
-      uint16_t len;
-   };
    /* Position pseudo header just before the TCP header */
-   struct pseudo_hdr *pseudo = (struct pseudo_hdr *) (buf + sizeof(struct iphdr)
-   - sizeof(struct pseudo_hdr));
+   pseudo_hdr *pseudo = (pseudo_hdr *) (buf + sizeof(struct iphdr)
+   - sizeof(pseudo_hdr));
    unsigned char *options = (unsigned char *) (buf + sizeof(struct iphdr) +
                                               sizeof(struct tcphdr));
    unsigned char *optptr;
@@ -808,7 +801,7 @@ send_packet(int s, host_entry *he, int ip_protocol,
  *	Construct the pseudo header (for TCP checksum purposes).
  *	Note that this overlaps the IP header and gets overwritten later.
  */
-   memset(pseudo, '\0', sizeof(struct pseudo_hdr));
+   memset(pseudo, '\0', sizeof(pseudo_hdr));
    pseudo->s_addr = source_address;
    pseudo->d_addr = he->addr.v4.s_addr;
    pseudo->proto  = ip_protocol;
@@ -887,7 +880,7 @@ send_packet(int s, host_entry *he, int ip_protocol,
       tcph->syn = 1;
    }
    tcph->window = htons(window);
-   tcph->check = in_cksum((uint16_t *)pseudo, sizeof(struct pseudo_hdr) +
+   tcph->check = in_cksum((uint16_t *)pseudo, sizeof(pseudo_hdr) +
                  sizeof(struct tcphdr) + options_len);
 /*
  *	Construct the IP Header.
@@ -1157,9 +1150,7 @@ initialise(void) {
  *
  *      None.
  *
- *      This is called once after all hosts have been processed.  It can be
- *      used to perform any tidying-up or statistics-displaying required.
- *      It does not have to do anything.
+ *      This is called once after all hosts have been processed.
  */
 void
 clean_up(void) {
@@ -1185,7 +1176,7 @@ clean_up(void) {
  *
  *	Returns:
  *
- *	None (this function never returns).
+ *	None (this function calls exit and never returns).
  */
 void
 usage(int status, int detailed) {
@@ -1346,8 +1337,8 @@ usage(int status, int detailed) {
  *
  *	Inputs:
  *
- *	name = The Name or IP address of the host.
- *	timeout = The initial host timeout in ms.
+ *	name	The Name or IP address of the host.
+ *	timeout	The initial host timeout in ms.
  *
  *	Returns:
  *
@@ -1443,6 +1434,10 @@ remove_host(host_entry **he) {
  *
  *	None.
  *
+ *	Returns:
+ *
+ *	None.
+ *
  *	Does nothing if there are no live entries in the list.
  */
 void
@@ -1463,13 +1458,18 @@ advance_cursor(void) {
  *
  *	Inputs:
  *
- *	s	= Socket file descriptor.
- *	buf	= Buffer to receive data read from socket.
- *	len	= Size of buffer.
- *	saddr	= Socket structure.
- *	tmo	= Select timeout in us.
+ *	s	Socket file descriptor.
+ *	buf	Buffer to receive data read from socket.
+ *	len	Size of buffer.
+ *	saddr	Socket structure.
+ *	tmo	Select timeout in us.
  *
- *	Returns number of characters received, or -1 for timeout.
+ *	Returns:
+ *
+ *	None.
+ *
+ *	This calls pcap_dispatch() if data was successfully read from
+ *	the socket.
  */
 void
 recvfrom_wto(int s, unsigned char *buf, int len, struct sockaddr *saddr,
@@ -1499,6 +1499,10 @@ recvfrom_wto(int s, unsigned char *buf, int len, struct sockaddr *saddr,
  *	Inputs:
  *
  *	None.
+ *
+ *	Returns:
+ *
+ *	None.
  */
 void
 dump_list(void) {
@@ -1511,6 +1515,19 @@ dump_list(void) {
    printf("\nTotal of %u host entries.\n\n", num_hosts);
 }
 
+/*
+ *	add_host_port -- Add a host and port to the list
+ *
+ *	Inputs:
+ *
+ *	name		Hostname or IP address of target system
+ *	timeout		timeout for this host in milliseconds
+ *	port		TCP destination port
+ *
+ *	Returns:
+ *
+ *	None.
+ */
 void
 add_host_port(char *name, unsigned timeout, unsigned port) {
    ip_address *hp=NULL;
@@ -1568,8 +1585,22 @@ add_host_port(char *name, unsigned timeout, unsigned port) {
    he->dport=port;
 }
 
-/* Standard BSD internet checksum routine */
-uint16_t in_cksum(uint16_t *ptr,int nbytes) {
+/*
+ *	in_cksum -- Internet checksum function
+ *
+ *	Inputs:
+ *
+ *	ptr		Pointer to data
+ *	nbytes		Number of bytes
+ *
+ *	Returns:
+ *
+ *	The checksum as a 16-bit unsigned value.
+ *
+ *	This is the standard BSD internet checksum routine.
+ */
+uint16_t
+in_cksum(uint16_t *ptr,int nbytes) {
 
    register uint32_t sum;
    uint16_t oddbyte;
@@ -1604,7 +1635,21 @@ uint16_t in_cksum(uint16_t *ptr,int nbytes) {
    return(answer);
 }
 
-uint32_t get_source_ip(char *devname) {
+/*
+ *	get_source_ip	-- Get source IP address for the specified interface
+ *
+ *	Inputs:
+ *
+ *	devname		The network interface name.
+ *
+ *	Returns:
+ *
+ *	The IP address of the specified interface as a 32-bit value.
+ *
+ *	This function works for Linux.
+ */
+uint32_t
+get_source_ip(const char *devname) {
    int sockfd;
    struct ifreq ifconfig;
    struct sockaddr_in sa;
@@ -1641,7 +1686,9 @@ uint32_t get_source_ip(char *devname) {
  *	packet_in The received packet data.
  *	n	The length of the received packet.
  *
- *	Returns a pointer to the host entry associated with the specified IP
+ *	Returns:
+ *
+ *	a pointer to the host entry associated with the specified IP
  *	or NULL if no match found.
  */
 host_entry *
@@ -1701,17 +1748,17 @@ find_host(host_entry **he, struct in_addr *addr,
 }
 
 /*
- * callback -- pcap callback function
+ *	callback -- pcap callback function
  *
- * Inputs:
+ *	Inputs:
  *
  *	args		Special args (not used)
  *	header		pcap header structure
  *	packet_in	The captured packet
  *
- * Returns:
+ *	Returns:
  *
- * None
+ *	None.
  */
 void
 callback(u_char *args, const struct pcap_pkthdr *header,
@@ -2006,6 +2053,10 @@ process_options(int argc, char *argv[]) {
  *
  *	None.
  *
+ *	Returns:
+ *
+ *	None.
+ *
  *	This displays the tcp-scan version information.
  */
 void
@@ -2032,7 +2083,7 @@ tcp_scan_version (void) {
  *
  *	serv_file	The services file name
  *
- *	Outputs:
+ *	Returns:
  *
  *	None.
  *
@@ -2105,7 +2156,7 @@ create_port_list(char *serv_file) {
  *
  *	flagstr		Pointer to the --flags option argument.
  *
- *	Outputs:
+ *	Returns:
  *
  *	None.
  *
