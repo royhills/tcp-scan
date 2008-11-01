@@ -192,16 +192,16 @@ void warn_msg(const char *, ...);
 void info_syslog(const char *, ...);
 void err_print(int, const char *, va_list);
 void usage(int, int);
-void add_host(char *, unsigned);
+void add_host(const char *, unsigned);
 int send_packet(int, host_entry *, int, struct timeval *);
-void recvfrom_wto(int, unsigned char *, int, struct sockaddr *, int);
+void recvfrom_wto(int, unsigned char *, int);
 void remove_host(host_entry **);
 void timeval_diff(const struct timeval *, const struct timeval *,
                   struct timeval *);
-host_entry *find_host(host_entry **, struct in_addr *,
+host_entry *find_host(host_entry **, const struct in_addr *,
                       const unsigned char *, int);
-void display_packet(int, const unsigned char *, host_entry *,
-                    struct in_addr *);
+void display_packet(int, const unsigned char *, const host_entry *,
+                    const struct in_addr *);
 void advance_cursor(void);
 void dump_list(void);
 void print_times(void);
@@ -221,10 +221,10 @@ void *Realloc(void *, size_t);
 unsigned long int Strtoul(const char *, int);
 long int Strtol(const char *, int);
 unsigned int hstr_i(const char *);
-uint16_t in_cksum(uint16_t *, int);
+uint16_t in_cksum(const uint16_t *, int);
 uint32_t get_source_ip(const char *);
-void add_host_port(char *, unsigned, unsigned);
-void create_port_list(char *);
+void add_host_port(const char *, unsigned, unsigned);
+void create_port_list(const char *);
 void process_tcp_flags(const char *);
 /* MT19937 prototypes */
 void init_genrand(unsigned long);

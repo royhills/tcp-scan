@@ -38,54 +38,53 @@
 static char const rcsid[] = "$Id$";   /* RCS ID for ident(1) */
 
 /* Global variables */
-unsigned retry = DEFAULT_RETRY;		/* Number of retries */
-unsigned timeout = DEFAULT_TIMEOUT;	/* Per-host timeout */
-float backoff_factor = DEFAULT_BACKOFF_FACTOR;	/* Backoff factor */
-int snaplen = SNAPLEN;			/* Pcap snap length */
-uint32_t seq_no;			/* Initial TCP sequence number */
-uint32_t ack_no;			/* TCP acknowledgement number */
-int seq_no_flag=0;
-int ack_no_flag=0;
-uint16_t source_port;			/* TCP Source Port */
-int source_port_flag=0;
-uint16_t window=DEFAULT_WINDOW;		/* TCP Window size */
-uint16_t mss=DEFAULT_MSS;		/* TCP MSS. 0=Don't use MSS option */
-int open_only=0;			/* Only show open ports? */
-int wscale_flag=0;			/* Add wscale=0 TCP option? */
-int sack_flag=0;			/* Add SACKOK TCP option? */
-int timestamp_flag=0;			/* Add TIMESTAMP TCP option? */
-int ip_ttl = DEFAULT_TTL;		/* IP TTL */
-char *if_name=NULL;			/* Interface name, e.g. "eth0" */
-int quiet_flag=0;			/* Don't decode the packet */
-int ignore_dups=0;			/* Don't display duplicate packets */
-int df_flag=DEFAULT_DF;			/* IP DF Flag */
-int ip_tos=DEFAULT_TOS;			/* IP TOS Field */
-int portname_flag=0;			/* Display port names */
-int tcp_flags_flag=0;			/* Specify outbound TCP flags */
-tcp_flags_struct tcp_flags;		/* Specified TCP flags */
-char **portnames=NULL;
-unsigned live_count;			/* Number of entries awaiting reply */
-char service_file[MAXLINE];		/* TCP Service file name */
-int verbose = 0;			/* Verbose level */
-int debug = 0;				/* Debug flag */
-char *local_data=NULL;			/* Local data from --port option */
-host_entry *helist = NULL;		/* Array of host entries */
-host_entry **helistptr;			/* Array of pointers to host entries */
-unsigned num_hosts = 0;			/* Number of entries in the list */
-unsigned max_iter;			/* Max iterations in find_host() */
-pcap_t *pcap_handle;			/* pcap handle */
-host_entry **cursor;			/* Pointer to current host entry ptr */
-unsigned responders = 0;		/* Number of hosts which responded */
-char filename[MAXLINE];
-int filename_flag=0;
-int random_flag=0;			/* Randomise the list */
-int numeric_flag=0;			/* IP addresses only */
-int ipv6_flag=0;			/* IPv6 */
-unsigned bandwidth=DEFAULT_BANDWIDTH;	/* Bandwidth in bits per sec */
-unsigned interval=0;
-
+static unsigned retry = DEFAULT_RETRY;		/* Number of retries */
+static unsigned timeout = DEFAULT_TIMEOUT;	/* Per-host timeout */
+static float backoff_factor = DEFAULT_BACKOFF_FACTOR;	/* Backoff factor */
+static int snaplen = SNAPLEN;		/* Pcap snap length */
+static uint32_t seq_no;			/* Initial TCP sequence number */
+static uint32_t ack_no;			/* TCP acknowledgement number */
+static int seq_no_flag=0;
+static int ack_no_flag=0;
+static uint16_t source_port;		/* TCP Source Port */
+static int source_port_flag=0;
+static uint16_t window=DEFAULT_WINDOW;	/* TCP Window size */
+static uint16_t mss=DEFAULT_MSS;	/* TCP MSS. 0=Don't use MSS option */
+static int open_only=0;			/* Only show open ports? */
+static int wscale_flag=0;		/* Add wscale=0 TCP option? */
+static int sack_flag=0;			/* Add SACKOK TCP option? */
+static int timestamp_flag=0;		/* Add TIMESTAMP TCP option? */
+static int ip_ttl = DEFAULT_TTL;	/* IP TTL */
+static char *if_name=NULL;		/* Interface name, e.g. "eth0" */
+static int quiet_flag=0;		/* Don't decode the packet */
+static int ignore_dups=0;		/* Don't display duplicate packets */
+static int df_flag=DEFAULT_DF;		/* IP DF Flag */
+static int ip_tos=DEFAULT_TOS;		/* IP TOS Field */
+static int portname_flag=0;		/* Display port names */
+static int tcp_flags_flag=0;		/* Specify outbound TCP flags */
+static tcp_flags_struct tcp_flags;	/* Specified TCP flags */
+static char **portnames=NULL;
+static unsigned live_count;		/* Number of entries awaiting reply */
+static char service_file[MAXLINE];	/* TCP Service file name */
+static int verbose = 0;			/* Verbose level */
+static int debug = 0;			/* Debug flag */
+static char *local_data=NULL;		/* Local data from --port option */
+static host_entry *helist = NULL;	/* Array of host entries */
+static host_entry **helistptr;		/* Array of pointers to host entries */
+static unsigned num_hosts = 0;		/* Number of entries in the list */
+static unsigned max_iter;		/* Max iterations in find_host() */
+static pcap_t *pcap_handle;		/* pcap handle */
+static host_entry **cursor;		/* Pointer to current host entry ptr */
+static unsigned responders = 0;		/* Number of hosts which responded */
+static char filename[MAXLINE];
+static int filename_flag=0;
+static int random_flag=0;		/* Randomise the list */
+static int numeric_flag=0;		/* IP addresses only */
+static int ipv6_flag=0;			/* IPv6 */
+static unsigned bandwidth=DEFAULT_BANDWIDTH;	/* Bandwidth in bits per sec */
+static unsigned interval=0;
 static uint32_t source_address;		/* Source IP Address */
-int pcap_fd;				/* pcap File Descriptor */
+static int pcap_fd;			/* pcap File Descriptor */
 static size_t ip_offset;		/* Offset to IP header in pcap pkt */
 static uint16_t *port_list=NULL;
 static char *ga_err_msg;		/* getaddrinfo error message */
@@ -95,7 +94,6 @@ static pcap_dumper_t *pcap_dump_handle = NULL;  /* pcap savefile handle */
 int
 main(int argc, char *argv[]) {
    int sockfd;                  /* IP socket file descriptor */
-   struct sockaddr_in sa_peer;
    struct timeval now;
    unsigned char packet_in[MAXIP];      /* Received packet */
    struct timeval diff;         /* Difference between two timevals */
@@ -353,8 +351,7 @@ main(int argc, char *argv[]) {
          if (debug) {print_times(); printf("main: Can't send packet yet.  loop_timediff=" TCP_UINT64_FORMAT "\n", loop_timediff);}
       } /* End If */
 
-      recvfrom_wto(pcap_fd, packet_in, MAXIP, (struct sockaddr *)&sa_peer,
-                   select_timeout);
+      recvfrom_wto(pcap_fd, packet_in, select_timeout);
    } /* End While */
 
    printf("\n");        /* Ensure we have a blank line */
@@ -395,8 +392,8 @@ main(int argc, char *argv[]) {
  *      was received in the format: <IP-Address><TAB><Details>.
  */
 void
-display_packet(int n, const unsigned char *packet_in, host_entry *he,
-               struct in_addr *recv_addr) {
+display_packet(int n, const unsigned char *packet_in, const host_entry *he,
+               const struct in_addr *recv_addr) {
    const struct iphdr *iph;
    const struct tcphdr *tcph;
    char *msg;
@@ -1348,7 +1345,7 @@ usage(int status, int detailed) {
  *	we use the helist array directly.
  */
 void
-add_host(char *name, unsigned timeout) {
+add_host(const char *name, unsigned timeout) {
    static int first_time_through=1;
    char *cp;
 
@@ -1460,8 +1457,6 @@ advance_cursor(void) {
  *
  *	s	Socket file descriptor.
  *	buf	Buffer to receive data read from socket.
- *	len	Size of buffer.
- *	saddr	Socket structure.
  *	tmo	Select timeout in us.
  *
  *	Returns:
@@ -1472,8 +1467,7 @@ advance_cursor(void) {
  *	the socket.
  */
 void
-recvfrom_wto(int s, unsigned char *buf, int len, struct sockaddr *saddr,
-             int tmo) {
+recvfrom_wto(int s, unsigned char *buf, int tmo) {
    fd_set readset;
    struct timeval to;
    int n;
@@ -1529,7 +1523,7 @@ dump_list(void) {
  *	None.
  */
 void
-add_host_port(char *name, unsigned timeout, unsigned port) {
+add_host_port(const char *name, unsigned timeout, unsigned port) {
    ip_address *hp=NULL;
    ip_address addr;
    host_entry *he;
@@ -1600,7 +1594,7 @@ add_host_port(char *name, unsigned timeout, unsigned port) {
  *	This is the standard BSD internet checksum routine.
  */
 uint16_t
-in_cksum(uint16_t *ptr,int nbytes) {
+in_cksum(const uint16_t *ptr, int nbytes) {
 
    register uint32_t sum;
    uint16_t oddbyte;
@@ -1692,7 +1686,7 @@ get_source_ip(const char *devname) {
  *	or NULL if no match found.
  */
 host_entry *
-find_host(host_entry **he, struct in_addr *addr,
+find_host(host_entry **he, const struct in_addr *addr,
           const unsigned char *packet_in, int n) {
    host_entry **p;
    int found = 0;
@@ -2093,7 +2087,7 @@ tcp_scan_version (void) {
  *	regarding invalid names and port numbers.
  */
 void
-create_port_list(char *serv_file) {
+create_port_list(const char *serv_file) {
    FILE *fh;
    char lbuf[1024];
    char desc[256];
