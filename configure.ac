@@ -1,7 +1,7 @@
 dnl $Id$
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT([tcp-scan], [1.17], [tcp-scan@nta-monitor.com])
+AC_INIT([tcp-scan], [1.18], [tcp-scan@nta-monitor.com])
 AC_PREREQ(2.59)
 AC_REVISION($Revision$)
 AC_CONFIG_SRCDIR([tcp-scan.c])
@@ -11,9 +11,12 @@ AM_CONFIG_HEADER([config.h])
 
 dnl Checks for programs.
 AC_PROG_CC
- if test -n "$GCC"; then
-      CFLAGS="$CFLAGS -Wall "
- fi
+if test -n "$GCC"; then
+   CFLAGS="$CFLAGS -Wall"
+   GCC_STACK_PROTECT_CC
+   GCC_FORTIFY_SOURCE
+   GCC_FORMAT_SECURITY
+fi
 AC_PROG_INSTALL
 AC_PROG_LN_S
 dnl Check endian-ness. MD5 and SHA1 hash functions need to know this.
