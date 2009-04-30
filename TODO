@@ -23,3 +23,8 @@ to "servicefile" [need to check NTA engine usage].
 
 create_port_list() uses the old strobe service file parsing code, which
 does not work with long service names, or names containing slashes.
+
+Change format of the services files that are used to select which ports are
+scanned, so that these contain just the port numbers and optional comments.
+These files are called services.*.  They live in /opt/nta/script and are in
+SVN under test_scripts/port_scans

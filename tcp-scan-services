@@ -1696,7 +1696,7 @@ cdfunc	2045/tcp
 sdfunc	2046/tcp
 dls	2047/tcp
 dls-monitor	2048/tcp
-shilp	2049/tcp
+nfsd	2049/tcp
 av-emb-config	2050/tcp
 epnsdp	2051/tcp
 clearvisn	2052/tcp

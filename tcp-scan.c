@@ -232,13 +232,14 @@ main(int argc, char *argv[]) {
    if (!interval) {
       size_t packet_out_len;
 
-      packet_out_len=send_packet(0, NULL, 1, NULL); /* Get packet data size */
+      packet_out_len=send_packet(0, NULL, 1, NULL); /* Get packet size */
       if (packet_out_len < MINIMUM_FRAME_SIZE)
          packet_out_len = MINIMUM_FRAME_SIZE;   /* Adjust to minimum size */
       packet_out_len += PACKET_OVERHEAD;        /* Add layer 2 overhead */
       interval = ((TCP_UINT64)packet_out_len * 8 * 1000000) / bandwidth;
       if (verbose) {
-         warn_msg("DEBUG: Ether pkt len=%u bytes, bandwidth=%u bps, int=%u us",
+         warn_msg("DEBUG: Ethernet frame len=%u bytes, bandwidth=%u bps, "
+                  "interval=%u us",
                   packet_out_len, bandwidth, interval);
       }
    }
@@ -364,7 +365,7 @@ main(int argc, char *argv[]) {
    elapsed_seconds = (elapsed_time.tv_sec*1000 +
                       elapsed_time.tv_usec/1000) / 1000.0;
 
-   printf("Ending %s: %u hosts scanned in %.3f seconds (%.2f hosts/sec).  %u responded\n",
+   printf("Ending %s: %u ports scanned in %.3f seconds (%.2f ports/sec).  %u responded\n",
           PACKAGE_STRING, num_hosts, elapsed_seconds, num_hosts/elapsed_seconds,
           responders);
    if (debug) {print_times(); printf("main: End\n");}
