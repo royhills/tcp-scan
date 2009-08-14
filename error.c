@@ -22,7 +22,6 @@
  *
  * Author:	Roy Hills
  * Date:	1 December 2001
- *
  */
 
 #include "tcp-scan.h"
@@ -41,7 +40,7 @@ err_sys(const char *fmt,...) {
    va_start(ap, fmt);
    err_print(1, fmt, ap);
    va_end(ap);
-   exit(1);
+   exit(EXIT_FAILURE);
 }
 
 /*
@@ -66,7 +65,7 @@ err_msg(const char *fmt,...) {
    va_start(ap, fmt);
    err_print(0, fmt, ap);
    va_end(ap);
-   exit(1);
+   exit(EXIT_FAILURE);
 }
 
 /*
@@ -106,5 +105,5 @@ err_print (int errnoflag, const char *fmt, va_list ap) {
 
 void
 error_use_rcsid(void) {
-   fprintf(stderr, "%s\n", rcsid);      /* Use rcsid to stop compiler optimising away */
+   fprintf(stderr, "%s\n", rcsid);	/* Use rcsid to stop compiler optimising away */
 }
