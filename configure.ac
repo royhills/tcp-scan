@@ -1,7 +1,7 @@
 dnl $Id$
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT([tcp-scan],[1.18],[tcp-scan@nta-monitor.com])
+AC_INIT([tcp-scan],[1.19],[tcp-scan@nta-monitor.com])
 AC_PREREQ(2.61)
 AC_REVISION($Revision$)
 AC_CONFIG_SRCDIR([tcp-scan.c])
@@ -12,7 +12,7 @@ AC_CONFIG_HEADERS([config.h])
 dnl Checks for programs.
 AC_PROG_CC
 if test -n "$GCC"; then
-   CFLAGS="$CFLAGS -Wall"
+   CFLAGS="$CFLAGS -Wall -Wwrite-strings"
    GCC_STACK_PROTECT_CC
    GCC_FORTIFY_SOURCE
    GCC_FORMAT_SECURITY

@@ -1062,7 +1062,6 @@ initialise(void) {
          err_sys("Cannot open services file");
       if (!(fp = fopen(fn, "r")))
          err_sys("Cannot open services file");
-      free(fn);
 /*
  *	Create a 65,536 element array of character pointers with each
  *	initialised to NULL.
@@ -1132,8 +1131,9 @@ initialise(void) {
       }
       fclose(fp);
       if (verbose) {
-         warn_msg("--- %d services loaded", num_entries);
+         warn_msg("--- %d services loaded from %s", num_entries, fn);
       }
+      free(fn);
    }
 }
 
@@ -1886,10 +1886,6 @@ process_options(int argc, char *argv[]) {
       switch (arg) {
          char *p1;
          char *p2;
-         char interval_str[MAXLINE];    /* --interval argument */
-         size_t interval_len;   /* --interval argument length */
-         char bandwidth_str[MAXLINE];   /* --bandwidth argument */
-         size_t bandwidth_len;  /* --bandwidth argument length */
 
          case 'f':	/* --file */
             strlcpy(filename, optarg, sizeof(filename));
@@ -1905,15 +1901,7 @@ process_options(int argc, char *argv[]) {
             timeout=Strtoul(optarg, 10);
             break;
          case 'i':	/* --interval */
-            strlcpy(interval_str, optarg, sizeof(interval_str));
-            interval_len=strlen(interval_str);
-            if (interval_str[interval_len-1] == 'u') {
-               interval=Strtoul(interval_str, 10);
-            } else if (interval_str[interval_len-1] == 's') {
-               interval=1000000 * Strtoul(interval_str, 10);
-            } else {
-               interval=1000 * Strtoul(interval_str, 10);
-            }
+            interval=str_to_interval(optarg);
             break;
          case 'b':	/* --backoff */
             backoff_factor=atof(optarg);
@@ -2014,15 +2002,7 @@ process_options(int argc, char *argv[]) {
             ipv6_flag=1;
             break;
          case 'B':      /* --bandwidth */
-            strlcpy(bandwidth_str, optarg, sizeof(bandwidth_str));
-            bandwidth_len=strlen(bandwidth_str);
-            if (bandwidth_str[bandwidth_len-1] == 'M') {
-               bandwidth=1000000 * Strtoul(bandwidth_str, 10);
-            } else if (bandwidth_str[bandwidth_len-1] == 'K') {
-               bandwidth=1000 * Strtoul(bandwidth_str, 10);
-            } else {
-               bandwidth=Strtoul(bandwidth_str, 10);
-            }
+            bandwidth=str_to_bandwidth(optarg);
             break;
          case 'c':	/* --ack */
             ack_no=Strtoul(optarg, 0);

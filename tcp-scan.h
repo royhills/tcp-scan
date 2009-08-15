@@ -225,6 +225,9 @@ uint32_t get_source_ip(const char *);
 void add_host_port(const char *, unsigned, unsigned);
 void create_port_list(const char *);
 void process_tcp_flags(const char *);
+unsigned str_to_bandwidth(const char *);
+unsigned str_to_interval(const char *);
+char *dupstr(const char *);
 /* MT19937 prototypes */
 void init_genrand(unsigned long);
 void init_by_array(unsigned long[], int);
