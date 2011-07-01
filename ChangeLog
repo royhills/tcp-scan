@@ -1,5 +1,22 @@
 $Id$
 
+2011-07-01 Roy Hills <Roy.Hills@nta-monitor.com>
+
+	* acinclude.m4: Updated to latest version from arp-scan source tree.
+	  This includes the GCC_WEXTRA macro and removes the dependence on the
+	  <features.h> header.
+
+	* configure.ac: Removed version number from AM_INIT_AUTOMAKE macro,
+	  as this usage is obsolete now. Added -Wshadow warning switch and
+	  Added GCC_WEXTRA macro to determine if the C compiler supports the
+	  -Wextra switch to enable extra warnings. Define ATTRIBUTE_UNUSED
+	  macro to enable portable use of attribute unused to mark possibly
+	  unused function arguments.
+
+	* tcp-scan.c, tcp-scan.h, utils.c: Remove unused variables, address
+	  signed/unsigned comparisons highlighted by -Wextra and address
+	  address shadowed variable warnings.
+
 2009-08-15 Roy Hills <Roy.Hills@nta-monitor.com>
 
 	* tcp-scan.c, utils.c: Improve handling of --bandwidth and

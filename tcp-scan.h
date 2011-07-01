@@ -193,13 +193,13 @@ void err_print(int, const char *, va_list);
 void usage(int, int);
 void add_host(const char *, unsigned);
 int send_packet(int, host_entry *, int, struct timeval *);
-void recvfrom_wto(int, unsigned char *, int);
+void recvfrom_wto(int, int);
 void remove_host(host_entry **);
 void timeval_diff(const struct timeval *, const struct timeval *,
                   struct timeval *);
 host_entry *find_host(host_entry **, const struct in_addr *,
-                      const unsigned char *, int);
-void display_packet(int, const unsigned char *, const host_entry *,
+                      const unsigned char *, unsigned);
+void display_packet(unsigned, const unsigned char *, const host_entry *,
                     const struct in_addr *);
 void advance_cursor(void);
 void dump_list(void);

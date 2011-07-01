@@ -95,7 +95,6 @@ int
 main(int argc, char *argv[]) {
    int sockfd;                  /* IP socket file descriptor */
    struct timeval now;
-   unsigned char packet_in[MAXIP];      /* Received packet */
    struct timeval diff;         /* Difference between two timevals */
    unsigned select_timeout;     /* Select timeout */
    TCP_UINT64 loop_timediff;    /* Time since last packet sent in us */
@@ -111,7 +110,7 @@ main(int argc, char *argv[]) {
    static int pass_no;
    int first_timeout=1;
    const int on = 1;            /* For setsockopt */
-   int i;
+   unsigned i;
 /*
  *	Initialise file names to the empty string.
  */
@@ -273,7 +272,7 @@ main(int argc, char *argv[]) {
  */
       timeval_diff(&now, &last_packet_time, &diff);
       loop_timediff = (TCP_UINT64)1000000*diff.tv_sec + diff.tv_usec;
-      if (loop_timediff >= req_interval) {
+      if (loop_timediff >= (unsigned)req_interval) {
          if (debug) {print_times(); printf("main: Can send packet now.  loop_timediff=" TCP_UINT64_FORMAT "\n", loop_timediff);}
 /*
  *      If the last packet to this host was sent more than the current
@@ -352,7 +351,7 @@ main(int argc, char *argv[]) {
          if (debug) {print_times(); printf("main: Can't send packet yet.  loop_timediff=" TCP_UINT64_FORMAT "\n", loop_timediff);}
       } /* End If */
 
-      recvfrom_wto(pcap_fd, packet_in, select_timeout);
+      recvfrom_wto(pcap_fd, select_timeout);
    } /* End While */
 
    printf("\n");        /* Ensure we have a blank line */
@@ -393,8 +392,8 @@ main(int argc, char *argv[]) {
  *      was received in the format: <IP-Address><TAB><Details>.
  */
 void
-display_packet(int n, const unsigned char *packet_in, const host_entry *he,
-               const struct in_addr *recv_addr) {
+display_packet(unsigned n, const unsigned char *packet_in,
+               const host_entry *he, const struct in_addr *recv_addr) {
    const struct iphdr *iph;
    const struct tcphdr *tcph;
    char *msg;
@@ -420,7 +419,7 @@ display_packet(int n, const unsigned char *packet_in, const host_entry *he,
  *	already been checked in callback().
  */
    if (n < ip_offset + sizeof(struct iphdr) + sizeof(struct tcphdr)) {
-      printf("%s%d byte packet too short to decode\n", msg, n);
+      printf("%s%u byte packet too short to decode\n", msg, n);
       free(msg);
       return;
    }
@@ -551,7 +550,7 @@ display_packet(int n, const unsigned char *packet_in, const host_entry *he,
  *	Determine TCP options.
  */
       optlen = 4*(tcph->doff) - sizeof(struct tcphdr);
-      if (optlen) {
+      if (optlen > 0) {
          char *options=NULL;
          int trunc=0;
          const unsigned char *optptr=(const unsigned char *)
@@ -566,14 +565,14 @@ display_packet(int n, const unsigned char *packet_in, const host_entry *he,
  *	Check if options have been truncated.
  */
          if (n - ip_offset - sizeof(struct iphdr) - sizeof(struct tcphdr)
-             < optlen) {
+             < (unsigned)optlen) {
             if (verbose)
-               warn_msg("---\tCaptured packet length %d is too short for calculated TCP options length %d.  Adjusting options length", n, optlen);
+               warn_msg("---\tCaptured packet length %u is too short for calculated TCP options length %d.  Adjusting options length", n, optlen);
             optlen = n - ip_offset - sizeof(struct iphdr) - sizeof(struct tcphdr);
             trunc=1;
          }
          if (ntohs(iph->tot_len) - sizeof(struct iphdr) - sizeof(struct tcphdr)
-             < optlen) {
+             < (unsigned)optlen) {
             if (verbose)
                warn_msg("---\tClaimed IP packet length %d is too short for calculated TCP options length %d.  Adjusting options length", ntohs(iph->tot_len), optlen);
             optlen = ntohs(iph->tot_len) - sizeof(struct iphdr) -
@@ -1335,8 +1334,8 @@ usage(int status, int detailed) {
  *
  *	Inputs:
  *
- *	name	The Name or IP address of the host.
- *	timeout	The initial host timeout in ms.
+ *	name		The Name or IP address of the host.
+ *	host_timeout	The initial host timeout in ms.
  *
  *	Returns:
  *
@@ -1346,7 +1345,7 @@ usage(int status, int detailed) {
  *	we use the helist array directly.
  */
 void
-add_host(const char *name, unsigned timeout) {
+add_host(const char *name, unsigned host_timeout) {
    static int first_time_through=1;
    char *cp;
 
@@ -1376,14 +1375,14 @@ add_host(const char *name, unsigned timeout) {
          if (!port1 || (port1 & 0x80000000))	/* Zero or -ve */
             err_msg("Invalid port specification: %s", local_data);
          if (*cp == ',' || *cp == '\0') {	/* Single port specification */
-            add_host_port(name, timeout, port1);
+            add_host_port(name, host_timeout, port1);
          } else if (*cp == '-') {		/* Inclusive range */
             cp++;
             port2=strtoul(cp, &cp, 10);
             if (!port2 || port2 <= port1)	/* Missing end or empty range */
                err_msg("Invalid port specification: %s", local_data);
             for (i=port1; i<=port2; i++)
-               add_host_port(name, timeout, i);
+               add_host_port(name, host_timeout, i);
          } else {
             err_msg("Invalid port specification: %s", local_data);
          }
@@ -1397,7 +1396,7 @@ add_host(const char *name, unsigned timeout) {
       int i=0;
 
       while (port_list[i])
-         add_host_port(name, timeout, port_list[i++]);
+         add_host_port(name, host_timeout, port_list[i++]);
    }
 }
 
@@ -1457,7 +1456,6 @@ advance_cursor(void) {
  *	Inputs:
  *
  *	s	Socket file descriptor.
- *	buf	Buffer to receive data read from socket.
  *	tmo	Select timeout in us.
  *
  *	Returns:
@@ -1468,7 +1466,7 @@ advance_cursor(void) {
  *	the socket.
  */
 void
-recvfrom_wto(int s, unsigned char *buf, int tmo) {
+recvfrom_wto(int s, int tmo) {
    fd_set readset;
    struct timeval to;
    int n;
@@ -1501,7 +1499,7 @@ recvfrom_wto(int s, unsigned char *buf, int tmo) {
  */
 void
 dump_list(void) {
-   int i;
+   unsigned i;
 
    printf("Host List:\n\n");
    printf("Entry\tIP Address\n");
@@ -1524,7 +1522,7 @@ dump_list(void) {
  *	None.
  */
 void
-add_host_port(const char *name, unsigned timeout, unsigned port) {
+add_host_port(const char *name, unsigned host_timeout, unsigned port) {
    ip_address *hp=NULL;
    ip_address addr;
    host_entry *he;
@@ -1572,7 +1570,7 @@ add_host_port(const char *name, unsigned timeout, unsigned port) {
       memcpy(&(he->addr.v4), &(addr.v4), sizeof(struct in_addr));
    }
    he->live = 1;
-   he->timeout = timeout * 1000;	/* Convert from ms to us */
+   he->timeout = host_timeout * 1000;	/* Convert from ms to us */
    he->num_sent = 0;
    he->num_recv = 0;
    he->last_send_time.tv_sec=0;
@@ -1688,7 +1686,7 @@ get_source_ip(const char *devname) {
  */
 host_entry *
 find_host(host_entry **he, const struct in_addr *addr,
-          const unsigned char *packet_in, int n) {
+          const unsigned char *packet_in, unsigned n) {
    host_entry **p;
    int found = 0;
    unsigned iterations = 0;	/* Used for debugging */
@@ -1756,18 +1754,18 @@ find_host(host_entry **he, const struct in_addr *addr,
  *	None.
  */
 void
-callback(u_char *args, const struct pcap_pkthdr *header,
-         const u_char *packet_in) {
+callback(u_char *args ATTRIBUTE_UNUSED,
+         const struct pcap_pkthdr *header, const u_char *packet_in) {
    const struct iphdr *iph;
    const struct tcphdr *tcph;
-   int n = header->caplen;
+   unsigned n = header->caplen;
    struct in_addr source_ip;
    host_entry *temp_cursor;
 /*
  *      Check that the packet is large enough to decode.
  */
    if (n < ip_offset + sizeof(struct iphdr) + sizeof(struct tcphdr)) {
-      printf("%d byte packet too short to decode\n", n);
+      printf("%u byte packet too short to decode\n", n);
       return;
    }
 /*
@@ -1812,7 +1810,7 @@ callback(u_char *args, const struct pcap_pkthdr *header,
          responders++;
       }
       if (verbose > 1)
-         warn_msg("---\tRemoving host entry %u (%s) - Received %d bytes", temp_cursor->n, inet_ntoa(source_ip), n);
+         warn_msg("---\tRemoving host entry %u (%s) - Received %u bytes", temp_cursor->n, inet_ntoa(source_ip), n);
       remove_host(&temp_cursor);
    } else {
 /*
@@ -1820,7 +1818,7 @@ callback(u_char *args, const struct pcap_pkthdr *header,
  *	Issue a message to that effect and ignore the packet.
  */
       if (verbose)
-         warn_msg("---\tIgnoring %d bytes from unknown host %s", n, inet_ntoa(source_ip));
+         warn_msg("---\tIgnoring %u bytes from unknown host %s", n, inet_ntoa(source_ip));
    }
 }
 

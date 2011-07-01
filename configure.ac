@@ -5,17 +5,23 @@ AC_INIT([tcp-scan],[1.19],[tcp-scan@nta-monitor.com])
 AC_PREREQ(2.61)
 AC_REVISION($Revision$)
 AC_CONFIG_SRCDIR([tcp-scan.c])
-AM_INIT_AUTOMAKE(1.9)
+AM_INIT_AUTOMAKE
 
 AC_CONFIG_HEADERS([config.h])
 
 dnl Checks for programs.
 AC_PROG_CC
 if test -n "$GCC"; then
-   CFLAGS="$CFLAGS -Wall -Wwrite-strings"
+   AC_DEFINE([ATTRIBUTE_UNUSED], [__attribute__ ((__unused__))],
+             [Define to the compiler's unused pragma])
+   CFLAGS="$CFLAGS -Wall -Wshadow -Wwrite-strings"
+   GCC_WEXTRA
    GCC_STACK_PROTECT_CC
    GCC_FORTIFY_SOURCE
    GCC_FORMAT_SECURITY
+else
+   AC_DEFINE([ATTRIBUTE_UNUSED], [],
+             [Define to the compiler's unused pragma])
 fi
 AC_PROG_INSTALL
 AC_PROG_LN_S
