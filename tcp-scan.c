@@ -161,9 +161,7 @@ main(int argc, char *argv[]) {
       char *cp;
 
       if ((strcmp(filename, "-")) == 0) {       /* Filename "-" means stdin */
-         if ((fp = fdopen(0, "r")) == NULL) {
-            err_sys("fdopen");
-         }
+         fp = stdin;
       } else {
          if ((fp = fopen(filename, "r")) == NULL) {
             err_sys("fopen");
@@ -993,7 +991,7 @@ initialise(void) {
          err_msg("Unsupported datalink type");
          break;
    }
-   if ((pcap_fd=pcap_fileno(pcap_handle)) < 0)
+   if ((pcap_fd=pcap_get_selectable_fd(pcap_handle)) < 0)
       err_msg("pcap_fileno: %s\n", pcap_geterr(pcap_handle));
    if ((pcap_setnonblock(pcap_handle, 1, errbuf)) < 0)
       err_msg("pcap_setnonblock: %s\n", errbuf);

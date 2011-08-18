@@ -1,5 +1,13 @@
 $Id$
 
+2011-08-18 Roy Hills <Roy.Hills@nta-monitor.com>
+
+	* tcp-scan.1: Added options section to manpage.
+
+	* tcp-scan.c:  Use pcap_get_selectable_fd() rather than pcap_fileno()
+          to get the pcap file descriptor. Use "stdin" instead of
+	  fdopen(0,"r") when using --filename=-
+
 2011-07-01 Roy Hills <Roy.Hills@nta-monitor.com>
 
 	* acinclude.m4: Updated to latest version from arp-scan source tree.
@@ -15,7 +23,7 @@ $Id$
 
 	* tcp-scan.c, tcp-scan.h, utils.c: Remove unused variables, address
 	  signed/unsigned comparisons highlighted by -Wextra and address
-	  address shadowed variable warnings.
+	  shadowed variable warnings.
 
 2009-08-15 Roy Hills <Roy.Hills@nta-monitor.com>
 

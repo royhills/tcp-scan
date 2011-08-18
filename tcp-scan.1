@@ -5,7 +5,7 @@
 .\" notice and this notice are preserved.
 .\"
 .\" $Id$
-.TH TCP-SCAN 1 "December 27, 2007"
+.TH TCP-SCAN 1 "August 18, 2011"
 .\" Please adjust this date whenever revising the man page.
 .SH NAME
 tcp-scan \- Bandwidth-optimised half-open TCP portscanner
@@ -28,6 +28,200 @@ privilege.
 The target hosts can be specified as IP addresses or hostnames.
 .SH DESCRIPTION
 .SH OPTIONS
+.TP
+.B --help or -h
+Display this usage message and exit.
+.TP
+.B --file=<fn> or -f <fn>
+Read hostnames or addresses from the specified file
+instead of from the command line. One name or IP
+address per line.  Use "-" for standard input.
+.TP
+.B --retry=<n> or -r <n>
+Set total number of attempts per host to <n>,
+default=3.
+.TP
+.B --timeout=<n> or -t <n>
+Set initial per host timeout to <n> ms, default=500.
+This timeout is for the first packet sent to each host.
+subsequent timeouts are multiplied by the backoff
+factor which is set with --backoff.
+.TP
+.B --bandwidth=<n> or -B <n>
+Set desired outbound bandwidth to <n>, default=56000
+The value is in bits per second by default.  If you
+append "K" to the value, then the units are kilobits
+per sec; and if you append "M" to the value, the
+units are megabits per second.
+The "K" and "M" suffixes represent the decimal, not
+binary, multiples.  So 64K is 64000, not 65536.
+.TP
+.B --interval=<n> or -i <n>
+Set minimum packet interval to <n> ms.
+The packet interval will be no smaller than this number.
+The interval specified is in milliseconds by default.
+if "u" is appended to the value, then the interval
+is in microseconds, and if "s" is appended, the
+interval is in seconds.
+If you want to use up to a given bandwidth, then it is
+easier to use the --bandwidth option instead.
+You cannot specify both --interval and --bandwidth
+because they are just different ways to change the
+same underlying variable.
+.TP
+.B --backoff=<b> or -b <b>
+Set timeout backoff factor to <b>, default=1.50.
+The per-host timeout is multiplied by this factor
+after each timeout.  So, if the number of retrys
+is 3, the initial per-host timeout is 500ms and the
+backoff factor is 1.5, then the first timeout will be
+500ms, the second 750ms and the third 1125ms.
+.TP
+.B --verbose or -v
+Display verbose progress messages.
+Use more than once for greater effect:
+.IP ""
+1 - Show when hosts are removed from the list and
+when packets with invalid cookies are received.
+.IP ""
+2 - Show each packet sent and received.
+.IP ""
+3 - Display the host list before
+scanning starts.
+.TP
+.B --version or -V
+Display program version and exit.
+.TP
+.B --random or -R
+Randomise the host list.
+.TP
+.B --numeric or -N
+IP addresses only, no hostnames.
+With this option, all hosts must be specified as
+IP addresses.  Hostnames are not permitted.
+.TP
+.B --port=<p> or -p <p>
+Specify TCP destination port(s).
+This option can be a single port, a list of ports
+separated by commas, or an inclusive range with the
+bounds separated by "-".
+.TP
+.B --sport=<p> or -s <p>
+Specify TCP source port.
+The default is a random port in the range 32678-65535.
+.TP
+.B --seq=<s> or -e <s>
+Specify initial sequence number.
+The default initial sequence number is random.
+.TP
+.B --ack=<a> or -c <a>
+Specify initial acknowledgement number.
+The default initial acknowledgement number is random.
+This is only applicable when the ACK flag is set in
+outgoing packets.
+.TP
+.B --window=<w> or -w <w>
+Specify the TCP window size.
+The default window size is 5840.
+.TP
+.B --openonly or -o
+Only display open ports.
+With this option, closed ports are not displayed.
+.TP
+.B --servicefile=<s> or -S <s>
+Use service file <s> for TCP ports.
+If this option is specified, then the TCP ports to
+scan are read from the specified file.  The file is
+same format as used by "strobe".
+.TP
+.B --mss=<n> or -m <n>
+Use TCP MSS <n>.  Default is 1460
+A non-zero MSS adds the MSS TCP option to the SYN packet
+which adds 4 bytes to the packet length.  If the MSS
+is specified as zero, then no MSS option is added.
+.TP
+.B --wscale or -W
+Add the WSCALE TCP option
+This option adds 4 bytes to the packet length.
+.TP
+.B --sack or -a
+Add the SACKOK TCP option
+This option adds 4 bytes to the packet length. However
+it does not increase packet size when used with the
+.B --timestamp option.
+.TP
+.B --timestamp or -T
+Add the TIMESTAMP TCP option
+The number of seconds since midnight 1/1/1970 is used
+for the timestamp value.
+This option adds 12 bytes to the packet length.
+.TP
+.B --snap=<s> or -n <s>
+Set the pcap snap length to <s>. Default=94.
+This specifies the frame capture length.  This
+length includes the data-link header as well as the
+IP and transport headers.  The default is normally
+sufficient.
+.TP
+.B --ttl=<t> or -l <t>
+Set the IP TTL to <t>. Default=64.
+You can specify a higher value if the targets are
+many hops away, or you can specify a lower value to
+limit the scope to the local network.
+.TP
+.B --interface=<i> or -I <u>
+Use network interface <i>.
+If this option is not specified, tcp-scan will search
+the system interface list for the lowest numbered,
+configured up interface (excluding loopback).
+.TP
+.B --quiet or -q
+Don't decode the received packet.
+If this option is specified, then only the minimum
+information is displayed.  This can be useful if you
+only want to know if a port is open or not, or if
+strange packets confuse the decoding process
+.TP
+.B --ignoredups or -g
+Don't display duplicate packets.
+By default, duplicate packets are displayed and flagged
+with "(DUP: n)" where n is the number of packets
+received from that host so far.
+.TP
+.B --df=<n> or -F <n>
+Enable (1) or disable (0) DF flag. Default=1
+Setting this option to 1 sets the DF flag in the IP
+header of the outbound SYN packets.  Setting it to 0
+clears the DF flag.
+.TP
+.B --tos=<n> or -O <n>
+Set IP TOS (Type of Service) to <n>. Default=0
+This sets the TOS value in the IP header for outbound
+packets.
+.TP
+.B --portname or -P
+Display port names as well as numbers.
+.TP
+.B --servicefile2=<f> or -E <f>
+Use TCP service filename <f>.
+The service file is used when displaying TCP port names.
+It is in the standard "/etc/services" file format.
+By default, the services file supplied with tcp-scan is
+used.
+.TP
+.B --flags=<f> or -L <f>
+Specify TCP flags to be set in outgoing packets.
+The flags should be specified as a comma-separated list
+from the set of: CWR,ECN,URG,ACK,PSH,RST,SYN,FIN.
+If this option is not specified, the flags default
+to SYN.
+.TP
+.B --pcapsavefile=<p> or -C <p>
+Write received packets to pcap savefile <p>.
+This option causes received TCP packets to be written
+to a pcap savefile with the specified name.  This
+savefile can be analyzed with programs that understand
+the pcap file format, such as "tcpdump" and "wireshark".
 .SH FILES
 .SH EXAMPLES
 .SH AUTHOR
