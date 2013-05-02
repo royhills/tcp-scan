@@ -1041,8 +1041,7 @@ initialise(void) {
  */
       if ((result=regcomp(&servent_pat, servent_pat_str, REG_EXTENDED|REG_ICASE))) {
          char reg_errbuf[MAXLINE];
-         size_t errlen;
-         errlen=regerror(result, &servent_pat, reg_errbuf, MAXLINE);
+         regerror(result, &servent_pat, reg_errbuf, MAXLINE);
          err_msg("ERROR: cannot compile regex pattern \"%s\": %s",
                  servent_pat_str, reg_errbuf);
       }
@@ -1083,8 +1082,7 @@ initialise(void) {
             continue;
          } else if (result != 0) {
             char reg_errbuf[MAXLINE];
-            size_t errlen;
-            errlen=regerror(result, &servent_pat, reg_errbuf, MAXLINE);
+            regerror(result, &servent_pat, reg_errbuf, MAXLINE);
             err_msg("ERROR: backoff pattern match regexec failed: %s", reg_errbuf);
          }
 /*

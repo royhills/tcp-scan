@@ -35,6 +35,10 @@
 
 #include "tcp-scan.h"
 
+#ifdef HAVE_LIMITS_H
+#include <limits.h>
+#endif
+
 #define EXPECTED_IP_HDR 20
 #define EXPECTED_TCP_HDR 20
 #define EXPECTED_PSEUDO_HDR 12

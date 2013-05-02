@@ -1,7 +1,7 @@
 dnl $Id$
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT([tcp-scan],[1.19],[tcp-scan@nta-monitor.com])
+AC_INIT([tcp-scan],[1.20],[tcp-scan@nta-monitor.com])
 AC_PREREQ(2.61)
 AC_REVISION($Revision$)
 AC_CONFIG_SRCDIR([tcp-scan.c])
@@ -58,7 +58,7 @@ AC_LINK_IFELSE([AC_LANG_CALL([], [pcap_lib_version])],
 
 dnl Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS([arpa/inet.h netdb.h netinet/in.h sys/socket.h sys/time.h unistd.h getopt.h pcap.h sys/ioctl.h net/if.h sys/utsname.h])
+AC_CHECK_HEADERS([arpa/inet.h netdb.h netinet/in.h sys/socket.h sys/time.h unistd.h getopt.h pcap.h sys/ioctl.h net/if.h sys/utsname.h limits.h])
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST

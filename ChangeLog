@@ -1,5 +1,16 @@
 $Id$
 
+2013-05-02 Roy Hills <Roy.Hills@nta-monitor.com>
+
+	* tcp-scan.c: Removed unneeded errlen declaration to avoid "set but
+	  not used" warning with GCC 4.6 and later.
+
+	* check-sizes.c: Added conditional include for <limits.h>, which is
+	  needed to define CHAR_BIT on Debian Wheezy.
+
+	* configure.ac: Added check for limits.h header. Incremented version
+	  number to 1.20.
+
 2011-08-18 Roy Hills <Roy.Hills@nta-monitor.com>
 
 	* tcp-scan.1: Added options section to manpage.
