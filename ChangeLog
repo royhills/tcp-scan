@@ -1,5 +1,9 @@
 $Id$
 
+2013-08-15 Roy Hills <Roy.Hills@nta-monitor.com>
+
+	* Final SVN revision before moving to git.
+
 2013-05-02 Roy Hills <Roy.Hills@nta-monitor.com>
 
 	* tcp-scan.c: Removed unneeded errlen declaration to avoid "set but
