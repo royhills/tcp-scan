@@ -1,5 +1,3 @@
-# $Id$
-#
 # tcp-scan-services -- TCP port number to service name map file for tcp-scan
 #
 # This file contains the TCP port number to service name mapping file that

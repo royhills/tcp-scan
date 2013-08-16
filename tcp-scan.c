@@ -16,8 +16,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
- * $Id$
- *
  * tcp-scan -- The TCP Scanner
  *
  * Author:	Roy Hills
@@ -34,8 +32,6 @@
  */
 
 #include "tcp-scan.h"
-
-static char const rcsid[] = "$Id$";   /* RCS ID for ident(1) */
 
 /* Global variables */
 static unsigned retry = DEFAULT_RETRY;		/* Number of retries */
@@ -2038,11 +2034,6 @@ tcp_scan_version (void) {
    fprintf(stderr, "For more information about these matters, see the file named COPYING.\n");
    fprintf(stderr, "\n");
    fprintf(stderr, "%s\n", pcap_lib_version());
-/* We use rcsid here to prevent it being optimised away */
-   fprintf(stderr, "%s\n", rcsid);
-   error_use_rcsid();
-   wrappers_use_rcsid();
-   utils_use_rcsid();
 }
 
 /*

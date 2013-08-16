@@ -16,8 +16,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
- * $Id$
- *
  * tcp-scan.h -- Header file for TCP protocol specific scanner
  *
  * Author:	Roy Hills
@@ -237,7 +235,3 @@ double genrand_real1(void);
 double genrand_real2(void);
 double genrand_real3(void);
 double genrand_res53(void);
-/* The following functions are just to prevent rcsid being optimised away */
-void wrappers_use_rcsid(void);
-void error_use_rcsid(void);
-void utils_use_rcsid(void);

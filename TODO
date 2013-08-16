@@ -1,5 +1,3 @@
-$Id$
-
 Don't display closed ports by default [need to check NTA engine usage].
 
 Display port names by default [need to check NTA engine usage].

@@ -1,5 +1,4 @@
 #!/bin/sh
-# $Id$
 #
 # check-tcp-scan-run1 -- Shell script to test tcp-scan basic functionality
 #

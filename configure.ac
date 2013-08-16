@@ -1,4 +1,3 @@
-dnl $Id$
 dnl Process this file with autoconf to produce a configure script.
 
 AC_INIT([tcp-scan],[1.20],[tcp-scan@nta-monitor.com])

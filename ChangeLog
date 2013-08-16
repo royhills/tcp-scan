@@ -1,4 +1,12 @@
-$Id$
+2013-08-16 Roy Hills <Roy.Hills@nta-monitor.com>
+
+	* .gitignore: New file listing patterns to exclude from the repository.
+
+	* COPYING: New file.
+
+	* Removed $Id$ keywords from all files, and associated rcsid variables
+	  from C source. These are not really needed and they don't work with
+	  git.
 
 2013-08-15 Roy Hills <Roy.Hills@nta-monitor.com>
 

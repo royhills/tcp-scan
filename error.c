@@ -16,8 +16,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
- * $Id$
- *
  * error.c -- error routines for tcp-scan
  *
  * Author:	Roy Hills
@@ -25,8 +23,6 @@
  */
 
 #include "tcp-scan.h"
-
-static char rcsid[] = "$Id$"; /* RCS ID for ident(1) */
 
 int daemon_proc;	/* Non-zero if process is a daemon */
 
@@ -101,9 +97,4 @@ err_print (int errnoflag, const char *fmt, va_list ap) {
    fflush(stdout);	/* In case stdout and stderr are the same */
    fputs(buf, stderr);
    fflush(stderr);
-}
-
-void
-error_use_rcsid(void) {
-   fprintf(stderr, "%s\n", rcsid);	/* Use rcsid to stop compiler optimising away */
 }

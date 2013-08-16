@@ -15,7 +15,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
- * $Id$
  *
  * Author: Roy Hills
  * Date: 8 November 2003
@@ -33,8 +32,6 @@
  */
 
 #include "tcp-scan.h"
-
-static char rcsid[] = "$Id$";	/* RCS ID for ident(1) */
 
 /*
  * We omit the timezone arg from this wrapper since it's obsolete and we never
@@ -97,8 +94,4 @@ long int Strtol(const char *nptr, int base) {
       err_msg("ERROR: \"%s\" is not a valid numeric value", nptr);
 
    return result;
-}
-
-void wrappers_use_rcsid(void) {
-   fprintf(stderr, "%s\n", rcsid);	/* Use rcsid to stop compiler optimising away */
 }
