@@ -1,5 +1,5 @@
 /*
- * The TCP Scanner (tcp-scan) is Copyright (C) 2003-2008 Roy Hills,
+ * The TCP Scanner (tcp-scan) is Copyright (C) 2003-2013 Roy Hills,
  * NTA Monitor Ltd.
  *
  * This file is part of tcp-scan.
@@ -1318,7 +1318,7 @@ usage(int status, int detailed) {
       fprintf(stderr, "use \"tcp-scan --help\" for detailed information on the available options.\n");
    }
    fprintf(stderr, "\n");
-   fprintf(stderr, "Report bugs or send suggestions to %s\n", PACKAGE_BUGREPORT);
+   fprintf(stderr, "Report bugs or send suggestions at %s\n", PACKAGE_BUGREPORT);
    exit(status);
 }
 
