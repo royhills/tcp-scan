@@ -1,6 +1,7 @@
 # tcp-scan
 
 [![Build Status](https://secure.travis-ci.org/royhills/tcp-scan.png)](http://travis-ci.org/royhills/tcp-scan)
+[![Coverage Status](https://coveralls.io/repos/royhills/tcp-scan/badge.png?branch=master)](https://coveralls.io/r/royhills/tcp-scan?branch=master)
 
 The TCP scanner.
 
