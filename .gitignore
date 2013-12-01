@@ -18,5 +18,8 @@ missing
 stamp-h1
 # Compiler output files
 *.o
+*.gcno
+*.gcda
+*.gcov
 tcp-scan
 check-sizes
