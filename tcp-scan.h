@@ -125,7 +125,7 @@
 #define IP_PROTOCOL 6			/* Default IP Protocol */
 #define DEFAULT_BACKOFF_FACTOR 1.5      /* Default timeout backoff factor */
 #define DEFAULT_RETRY 3                 /* Default number of retries */
-#define DEFAULT_TIMEOUT 500             /* Default per-host timeout in ms */
+#define DEFAULT_TIMEOUT 2000            /* Default per-host timeout in ms */
 #define SNAPLEN 94			/* 14 (ether) + 20 (IP) + 60 (TCP) */
 #define PROMISC 0			/* Enable promiscuous mode */
 #define TO_MS 0				/* Timeout for pcap_open_live() */
