@@ -13,6 +13,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    - name: apt-get-update
+      run: sudo apt-get update -qq
+    - name: install-libpcap
+      run: sudo apt-get install -qq libpcap0.8-dev
     - name: autoreconf
       run: autoreconf --install
     - name: configure
