@@ -3,7 +3,7 @@
 [![Build Status](https://secure.travis-ci.org/royhills/tcp-scan.png)](http://travis-ci.org/royhills/tcp-scan)
 [![Coverage Status](https://coveralls.io/repos/royhills/tcp-scan/badge.png?branch=master)](https://coveralls.io/r/royhills/tcp-scan?branch=master)
 
-![example workflow](https://github.com/github/docs/actions/workflows/c-ccp.yml/badge.svg)
+![Build](https://github.com/royhills/tcp-scan/actions/workflows/c-ccp.yml/badge.svg)
 
 The TCP scanner.
 
