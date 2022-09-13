@@ -1,9 +1,7 @@
 # tcp-scan
 
-[![Build Status](https://secure.travis-ci.org/royhills/tcp-scan.png)](http://travis-ci.org/royhills/tcp-scan)
+[![Build](https://github.com/royhills/tcp-scan/actions/workflows/c-cpp.yml/badge.svg)](https://github.com/royhills/tcp-scan/actions/workflows/c-cpp.yml)
 [![Coverage Status](https://coveralls.io/repos/royhills/tcp-scan/badge.png?branch=master)](https://coveralls.io/r/royhills/tcp-scan?branch=master)
-
-![Build](https://github.com/royhills/tcp-scan/actions/workflows/c-ccp.yml/badge.svg)
 
 The TCP scanner.
 
