@@ -29,5 +29,5 @@ jobs:
       - name: make check
         run: make check
       - name: run coveralls
-        run: coveralls --repo-token ${{ secrets.GITHUB_TOKEN }}
+        run: coveralls --verbose --repo-token ${{ secrets.GITHUB_TOKEN }}
       
