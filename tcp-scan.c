@@ -232,7 +232,7 @@ main(int argc, char *argv[]) {
       packet_out_len += PACKET_OVERHEAD;        /* Add layer 2 overhead */
       interval = ((TCP_UINT64)packet_out_len * 8 * 1000000) / bandwidth;
       if (verbose) {
-         warn_msg("DEBUG: Ethernet frame len=%u bytes, bandwidth=%u bps, "
+         warn_msg("DEBUG: Ethernet frame len=%zu bytes, bandwidth=%u bps, "
                   "interval=%u us",
                   packet_out_len, bandwidth, interval);
       }
