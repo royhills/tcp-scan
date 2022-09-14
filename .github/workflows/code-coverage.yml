@@ -14,10 +14,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - name: install libpcap
+      - name: install libpcap and lcov
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -qq libpcap0.8-dev 
+          sudo apt-get install -qq libpcap0.8-dev lcov
 #      - name: install cpp-coveralls
 #        run: sudo pip install cpp-coveralls
       - name: autoreconf
