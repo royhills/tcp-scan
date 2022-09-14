@@ -18,8 +18,8 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -qq libpcap0.8-dev 
-      - name: install cpp-coveralls
-        run: sudo pip install cpp-coveralls
+#      - name: install cpp-coveralls
+#        run: sudo pip install cpp-coveralls
       - name: autoreconf
         run: autoreconf --install
       - name: configure with gcov
@@ -28,6 +28,10 @@ jobs:
         run: make
       - name: make check
         run: make check
-      - name: run coveralls
-        run: coveralls --verbose --repo-token ${{ secrets.GITHUB_TOKEN }}
+      - name: Coveralls
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+#      - name: run coveralls
+#        run: coveralls --verbose --repo-token ${{ secrets.GITHUB_TOKEN }}
       
