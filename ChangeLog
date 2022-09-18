@@ -1,3 +1,8 @@
+2022-09-18 Roy Hills <Roy.Hills@nta-monitor.com>
+
+	* check-tcp-scan-run1: Changed "$srcdir/tcp-scan" to "./tcp-scan"
+	  in test scripts so "make distcheck" succeeds.
+
 2022-09-14 Roy Hills <Roy.Hills@nta-monitor.com>
 
 	* README.md, .github/workflows/*: Migrated from travis-ci to github

@@ -29,7 +29,7 @@
 TMPFILE=/tmp/tcp-scan-test.$$.tmp
 #
 echo "Checking tcp-scan --help ..."
-$srcdir/tcp-scan --help 2> $TMPFILE
+./tcp-scan --help 2> $TMPFILE
 if test $? -ne 0; then
    rm -f $TMPFILE
    echo "FAILED"
@@ -44,7 +44,7 @@ fi
 echo "ok"
 #
 echo "Checking tcp-scan --version ..."
-$srcdir/tcp-scan --version 2> $TMPFILE
+./tcp-scan --version 2> $TMPFILE
 if test $? -ne 0; then
    rm -f $TMPFILE
    echo "FAILED"
