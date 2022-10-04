@@ -1,3 +1,21 @@
+2022-10-04 Roy Hills <Roy.Hills@nta-monitor.com>
+
+	* acinclude.m4: fix typo in 'if test "X$CC" != "X"' checks. Declare main() as
+	  int to fix -Wimplicit-int errors.
+
+	* configure.ac: Increment version to 1.21. Update pcap library check to
+	  check for pcap_set_immediate_mode() instead of pcap_lib_version() because
+	  we need pcap version 1.5 or later. Remove checks for ANSI C compiler as
+	  we now assume this to be present.
+
+	* wrappers.c: New function my_lookupdev() to replace pcap_lookupdev()
+	  which is depreciated in libpcap 1.9.0 and later.
+
+	* tcp-scan.c: use pcap_create(), pcap_set_XXX() , pcap_activate() instead of
+	  the old pcap_open_live().
+
+	* tcp-scan.h: Include STDC headers unconditionally.
+
 2022-09-18 Roy Hills <Roy.Hills@nta-monitor.com>
 
 	* check-tcp-scan-run1: Changed "$srcdir/tcp-scan" to "./tcp-scan"

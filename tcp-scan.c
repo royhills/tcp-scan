@@ -935,6 +935,7 @@ initialise(void) {
    int datalink;
    unsigned random_seed;
    struct timeval tv;
+   int ret_status;
 /*
  *	Seed PRNG.
  */
@@ -959,19 +960,54 @@ initialise(void) {
 /*
  *      Determine network interface to use and associated IP address.
  *      If the interface was specified with the --interface option then use
- *      that, otherwise use pcap_lookupdev() to pick a suitable interface.
+ *      that, otherwise use my_lookupdev() to pick a suitable interface.
  */
    if (!if_name) { /* i/f not specified with --interface */
-      if (!(if_name=pcap_lookupdev(errbuf))) {
-         err_msg("pcap_lookupdev: %s", errbuf);
+      if (!(if_name=my_lookupdev(errbuf))) {
+         err_msg("my_lookupdev: %s", errbuf);
       }
    }
    source_address = get_source_ip(if_name);
 /*
  *	Prepare pcap
  */
-   if (!(pcap_handle=pcap_open_live(if_name, snaplen, PROMISC, TO_MS, errbuf)))
-      err_msg("pcap_open_live: %s\n", errbuf);
+   if (!(pcap_handle = pcap_create(if_name, errbuf)))
+      err_msg("pcap_create: %s", errbuf);
+   if ((pcap_set_snaplen(pcap_handle, snaplen)) < 0)
+      err_msg("pcap_set_snaplen: %s", pcap_geterr(pcap_handle));
+   if ((pcap_set_promisc(pcap_handle, PROMISC)) < 0)
+      err_msg("pcap_set_promisc: %s", pcap_geterr(pcap_handle));
+   if ((pcap_set_immediate_mode(pcap_handle, 1)) < 0)
+      err_msg("pcap_set_immediate_mode: %s", pcap_geterr(pcap_handle));
+   if ((pcap_set_timeout(pcap_handle, TO_MS)) < 0) /* Is this still needed? */
+      err_msg("pcap_set_timeout: %s", pcap_geterr(pcap_handle));
+   ret_status = pcap_activate(pcap_handle);
+   if (ret_status < 0) {             /* Error from pcap_activate() */
+      char *cp;
+
+      cp = pcap_geterr(pcap_handle);
+      if (ret_status == PCAP_ERROR)
+         err_msg("pcap_activate: %s", cp);
+      else if ((ret_status == PCAP_ERROR_NO_SUCH_DEVICE ||
+                ret_status == PCAP_ERROR_PERM_DENIED) && *cp != '\0')
+         err_msg("pcap_activate: %s: %s\n(%s)", if_name,
+                 pcap_statustostr(ret_status), cp);
+      else
+         err_msg("pcap_activate: %s: %s", if_name,
+                 pcap_statustostr(ret_status));
+   } else if (ret_status > 0) {      /* Warning from pcap_activate() */
+      char *cp;
+
+      cp = pcap_geterr(pcap_handle);
+      if (ret_status == PCAP_WARNING)
+         warn_msg("pcap_activate: %s", cp);
+      else if (ret_status == PCAP_WARNING_PROMISC_NOTSUP && *cp != '\0')
+         warn_msg("pcap_activate: %s: %s\n(%s)", if_name,
+                  pcap_statustostr(ret_status), cp);
+      else
+         warn_msg("pcap_activate: %s: %s", if_name,
+                  pcap_statustostr(ret_status));
+   }
    if ((datalink=pcap_datalink(pcap_handle)) < 0)
       err_msg("pcap_datalink: %s\n", pcap_geterr(pcap_handle));
    printf("Interface: %s, datalink type: %s (%s)\n", if_name,
@@ -1001,6 +1037,8 @@ initialise(void) {
       filter_string=make_message("tcp dst port %u and tcp[8:4] = %u",
                                  source_port, seq_no+1);
    }
+   if (verbose > 1)
+      warn_msg("DEBUG: pcap filter string: \"%s\"", filter_string);
    if ((pcap_compile(pcap_handle, &filter, filter_string, OPTIMISE, netmask)) < 0)
       err_msg("pcap_geterr: %s\n", pcap_geterr(pcap_handle));
    free(filter_string);
@@ -1754,6 +1792,7 @@ callback(u_char *args ATTRIBUTE_UNUSED,
    unsigned n = header->caplen;
    struct in_addr source_ip;
    host_entry *temp_cursor;
+
 /*
  *      Check that the packet is large enough to decode.
  */
